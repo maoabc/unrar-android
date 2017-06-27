@@ -13,10 +13,10 @@
    unnecessary in Unrar, especially in header files.
 
    If you wish to port Unrar to a new platform, you may need to edit
-   '#define LITTLE_ENDIAN' in os.hpp and data type definitions
+   '#define LITTLE_ENDIAN' in os.hpp and child type definitions
    in rartypes.hpp.
 
-   if computer architecture does not allow not aligned data access,
+   if computer architecture does not allow not aligned child access,
    you need to undefine ALLOW_NOT_ALIGNED_INT and define
    STRICT_ALIGNMENT_REQUIRED in os.h.
 
