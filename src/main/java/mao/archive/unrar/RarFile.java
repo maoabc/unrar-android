@@ -26,7 +26,7 @@ public class RarFile {
     }
 
     //只能判断rar文件名是否加密,如果只加密数据还要根据头进一部判断
-    private final boolean[] encrypted = new boolean[1];
+    private final boolean encrypted;
 
     private final String rarName;  //Rar文件路径
     private String password;
@@ -35,6 +35,7 @@ public class RarFile {
     public RarFile(String rarName, String password) {
         this.rarName = rarName;
         this.password = password;
+        encrypted = checkEncrypted();
     }
 
     public RarFile(String rarName) {
@@ -56,9 +57,9 @@ public class RarFile {
      * @throws IOException
      */
     public Iterable<RarEntry> entries() throws IOException {
-        final long handle = openArchive(rarName, RAR_OM_LIST, encrypted);
+        final long handle = openArchive(rarName, RAR_OM_LIST, null);
 
-        if (encrypted[0]) {
+        if (encrypted) {
             setPassword(handle, password);
         }
         return new Iterable<RarEntry>() {
@@ -110,19 +111,14 @@ public class RarFile {
      * @throws IOException
      */
     public byte[] extractOne(String entryName) throws IOException {
-        final long handle = openArchive(rarName, RAR_OM_EXTRACT, encrypted);
-        boolean b = false;
-        if (encrypted[0]) {
-            setPassword(handle, password);
-            b = true;
-        }
+        final long handle = openArchive(rarName, RAR_OM_EXTRACT, null);
         try {
+            if (encrypted) {
+                setPassword(handle, password);
+            }
             RarEntry header;
             while ((header = readHeader(handle)) != null) {
                 if (header.getName().equals(entryName)) {
-                    if (!b && header.isEncrypted()) {
-                        setPassword(handle, password);
-                    }
                     ByteArrayOutputStream outputStream = new ByteArrayOutputStream((int) header.getSize());
                     readData(handle, null, outputStream);
                     return outputStream.toByteArray();
@@ -145,92 +141,68 @@ public class RarFile {
      * @throws IOException
      */
 
-    public int extractOne(String entryName, OutputStream outputStream) throws IOException {
+    public void extractOne(String entryName, OutputStream outputStream) throws IOException {
         if (outputStream == null) {
-            return -1;
+            throw new NullPointerException("output stream is null");
         }
-        final long handle = openArchive(rarName, RAR_OM_EXTRACT, encrypted);
-        boolean b = false;
-        if (encrypted[0]) {
-            setPassword(handle, password);
-            b = true;
-        }
+        final long handle = openArchive(rarName, RAR_OM_EXTRACT, null);
+
         try {
+
+            if (encrypted) {
+                setPassword(handle, password);
+            }
             RarEntry header;
             while ((header = readHeader(handle)) != null) {
                 if (header.getName().equals(entryName)) {
-
-                    if (!b && header.isEncrypted()) {
-                        setPassword(handle, password);
-                    }
-                    return readData(handle, null, outputStream);
-                } else {
-                    readData(handle, null, null);
+                    readData(handle, null, outputStream);
+                    return;
                 }
+                readData(handle, null, null);
             }
         } finally {
             closeArchive(handle);
         }
-        return -1;
     }
 
 
     /**
      * 解压所有数据到某个目录
      *
-     * @param destPath        解压目标目录
+     * @param destPath         解压目标目录
      * @param progressListener 解压进度监听
      * @throws IOException
      */
     public void extractAllToDestPath(String destPath, ProgressListener progressListener) throws IOException {
-        final long handle = openArchive(rarName, RAR_OM_EXTRACT, encrypted);
-        boolean b = false;
-        if (encrypted[0]) {
-            setPassword(handle, password);
-            b = true;
-        }
-        try {
-            RarEntry header;
-            while ((header = readHeader(handle)) != null) {
-                if (!b && header.isEncrypted()) {
-                    setPassword(handle, password);
-                    b = true;
-                }
-                if (progressListener != null) progressListener.onProgressing(header.getName(), header.getSize());
-                readData(handle, destPath, null);
+        extractBatchDestPath(destPath, new ExtractFilter() {
+            @Override
+            public boolean filter(RarEntry entry) {
+                return true;
             }
-        } finally {
-            closeArchive(handle);
-        }
+        }, progressListener);
     }
 
 
     /**
      * 批量解压数据到某个目录
      *
-     * @param destPath 解压目标目录
-     * @param filter   对解压数据进行过滤
+     * @param destPath         解压目标目录
+     * @param filter           对解压数据进行过滤
      * @param progressListener 解压进度监听
      * @throws IOException
      */
     public void extractBatchDestPath(String destPath, ExtractFilter filter, ProgressListener progressListener) throws IOException {
-        final long handle = openArchive(rarName, RAR_OM_EXTRACT, encrypted);
-        boolean b = false;
-        if (encrypted[0]) {
-            setPassword(handle, password);
-            b = true;
-        }
+        final long handle = openArchive(rarName, RAR_OM_EXTRACT, null);
         try {
+            if (encrypted) {
+                setPassword(handle, password);
+            }
             RarEntry header;
             while ((header = readHeader(handle)) != null) {
                 if (filter == null || filter.filter(header)) {
-                    if (!b && header.isEncrypted()) {
-                        setPassword(handle, password);
-                        b = true;
-                    }
-                    if (progressListener != null) progressListener.onProgressing(header.getName(), header.getSize());
+                    if (progressListener != null)
+                        progressListener.onProgressing(header.getName(), header.getSize());
                     readData(handle, destPath, null);
-                    //TODO 返回错误处理
                 } else {
                     //跳过解压数据
                     readData(handle, null, null);
@@ -242,15 +214,30 @@ public class RarFile {
     }
 
     //检查rar文件名是否被加密
-    public boolean isEncrypted() {
+    private synchronized boolean checkEncrypted() {
         long handle = -1;
         try {
+            boolean[] encrypted = new boolean[1];
             handle = openArchive(rarName, RAR_OM_LIST, encrypted);
-        } catch (RarException ignored) {
+            if (encrypted[0]) {
+                return true;
+            }
+            RarEntry header;
+            while ((header = readHeader(handle)) != null) {
+                if (header.isEncrypted()) {
+                    return true;
+                }
+                readData(handle, null, null);
+            }
+        } catch (IOException ignored) {
         } finally {
             if (handle != -1) closeArchive(handle);
         }
-        return encrypted[0];
+        return false;
+    }
+
+    public boolean isEncrypted() {
+        return encrypted;
     }
 
     public String getPassword() {

@@ -34,7 +34,7 @@
    3. Acknowledgements
 
    This source includes parts of code written by other authors.
-   Please see acknow.txt file for details.
+   Please see acknow.txt virtualFile for details.
 
 
    4. Legal stuff
