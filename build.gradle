@@ -12,12 +12,13 @@ android {
         versionName "1.0"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
 
-        ndk {
-            abiFilters 'armeabi-v7a', 'x86'
-        }
+//        ndk {
+//            abiFilters 'armeabi-v7a', 'x86'
+//        }
         externalNativeBuild {
             cmake {
                 abiFilters 'armeabi-v7a', 'x86'
+                arguments "-DANDROID_STL=gnustl_static"
             }
         }
     }

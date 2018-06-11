@@ -5,7 +5,7 @@
 #define TRUE  1
 
 #ifdef __EMX__
-#define INCL_BASE
+  #define INCL_BASE
 #endif
 
 #if defined(RARDLL) && !defined(SILENT)
@@ -39,6 +39,8 @@
 #include <prsht.h>
 #include <shlwapi.h>
 #pragma comment(lib, "Shlwapi.lib")
+#include <PowrProf.h>
+#pragma comment(lib, "PowrProf.lib")
 #include <shellapi.h>
 #include <shlobj.h>
 #include <winioctl.h>
@@ -54,19 +56,19 @@
 #include <dos.h>
 
 #if !defined(_EMX) && !defined(_MSC_VER)
-#include <dir.h>
+  #include <dir.h>
 #endif
 #ifdef _MSC_VER
-#if _MSC_VER<1500
-#define for if (0) ; else for
-#endif
-#include <direct.h>
-#include <intrin.h>
+  #if _MSC_VER<1500
+    #define for if (0) ; else for
+  #endif
+  #include <direct.h>
+  #include <intrin.h>
 
-#define USE_SSE
-#define SSE_ALIGNMENT 16
+  #define USE_SSE
+  #define SSE_ALIGNMENT 16
 #else
-#include <dirent.h>
+  #include <dirent.h>
 #endif // _MSC_VER
 
 #include <stdio.h>
@@ -101,16 +103,16 @@
 #define APPENDTEXT   "at"
 
 #if defined(_WIN_ALL)
-#ifdef _MSC_VER
-#define _stdfunction __cdecl
-#define _forceinline __forceinline
+  #ifdef _MSC_VER
+    #define _stdfunction __cdecl
+    #define _forceinline __forceinline
+  #else
+    #define _stdfunction _USERENTRY
+    #define _forceinline inline
+  #endif
 #else
-#define _stdfunction _USERENTRY
-#define _forceinline inline
-#endif
-#else
-#define _stdfunction
-#define _forceinline inline
+  #define _stdfunction
+  #define _forceinline inline
 #endif
 
 #endif // defined(_WIN_ALL) || defined(_EMX)
@@ -123,23 +125,20 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
-
 #if defined(__QNXNTO__)
-#include <sys/param.h>
+  #include <sys/param.h>
 #endif
 #if defined(RAR_SMP) && defined(__APPLE__)
-#include <sys/sysctl.h>
+  #include <sys/sysctl.h>
 #endif
 #ifndef SFX_MODULE
-
-#ifdef __ANDROID_API__
+  #if defined(__ANDROID__)
     #include <sys/vfs.h>
-#else
+    #define statvfs statfs
+  #else
     #include <sys/statvfs.h>
+  #endif
 #endif
-
-#endif
-
 #include <pwd.h>
 #include <grp.h>
 #include <wchar.h>
@@ -162,11 +161,11 @@
 #define SAVE_LINKS
 #endif
 
-#if defined(__linux) || defined(__FreeBSD__)
-
-#include <sys/time.h>
-
-#define USE_LUTIMES
+#if defined(__linux) || defined(__FreeBSD__) || defined(__ANDROID__)
+  #if __ANDROID_API__ >= 26
+    #include <sys/time.h>
+    #define USE_LUTIMES
+  #endif
 #endif
 
 #define ENABLE_ACCESS
@@ -186,73 +185,73 @@
 #define WRITEBINARY  "w"
 #define APPENDTEXT   "a"
 
-#define _stdfunction
+#define _stdfunction 
 #define _forceinline inline
 
 #ifdef _APPLE
-#if defined(__BIG_ENDIAN__) && !defined(BIG_ENDIAN)
-#define BIG_ENDIAN
-#undef LITTLE_ENDIAN
-#endif
-#if defined(__i386__) && !defined(LITTLE_ENDIAN)
-#define LITTLE_ENDIAN
-#undef BIG_ENDIAN
-#endif
+  #if defined(__BIG_ENDIAN__) && !defined(BIG_ENDIAN)
+    #define BIG_ENDIAN
+    #undef LITTLE_ENDIAN
+  #endif
+  #if defined(__i386__) && !defined(LITTLE_ENDIAN)
+    #define LITTLE_ENDIAN
+    #undef BIG_ENDIAN
+  #endif
 #endif
 
 #if defined(__sparc) || defined(sparc) || defined(__hpux)
-#ifndef BIG_ENDIAN
-#define BIG_ENDIAN
-#endif
+  #ifndef BIG_ENDIAN
+     #define BIG_ENDIAN
+  #endif
 #endif
 
 #if _POSIX_C_SOURCE >= 200809L
-#define UNIX_TIME_NS // Nanosecond time precision in Unix.
+  #define UNIX_TIME_NS // Nanosecond time precision in Unix.
 #endif
 
 #endif // _UNIX
 
 #if 0
-#define MSGID_INT
-typedef int MSGID;
+  #define MSGID_INT
+  typedef int MSGID;
 #else
-typedef const wchar *MSGID;
+  typedef const wchar* MSGID;
 #endif
 
 #ifndef SSE_ALIGNMENT // No SSE use and no special data alignment is required.
-#define SSE_ALIGNMENT 1
+  #define SSE_ALIGNMENT 1
 #endif
 
 #define safebuf static
 
 // Solaris defines _LITTLE_ENDIAN or _BIG_ENDIAN.
 #if defined(_LITTLE_ENDIAN) && !defined(LITTLE_ENDIAN)
-#define LITTLE_ENDIAN
+  #define LITTLE_ENDIAN
 #endif
 #if defined(_BIG_ENDIAN) && !defined(BIG_ENDIAN)
-#define BIG_ENDIAN
+  #define BIG_ENDIAN
 #endif
 
 #if !defined(LITTLE_ENDIAN) && !defined(BIG_ENDIAN)
-#if defined(__i386) || defined(i386) || defined(__i386__) || defined(__x86_64)
-#define LITTLE_ENDIAN
-#elif defined(BYTE_ORDER) && BYTE_ORDER == LITTLE_ENDIAN
-#define LITTLE_ENDIAN
-#elif defined(BYTE_ORDER) && BYTE_ORDER == BIG_ENDIAN
-#define BIG_ENDIAN
-#else
-#error "Neither LITTLE_ENDIAN nor BIG_ENDIAN are defined. Define one of them."
-#endif
+  #if defined(__i386) || defined(i386) || defined(__i386__) || defined(__x86_64)
+    #define LITTLE_ENDIAN
+  #elif defined(BYTE_ORDER) && BYTE_ORDER == LITTLE_ENDIAN || defined(__LITTLE_ENDIAN__)
+    #define LITTLE_ENDIAN
+  #elif defined(BYTE_ORDER) && BYTE_ORDER == BIG_ENDIAN || defined(__BIG_ENDIAN__)
+    #define BIG_ENDIAN
+  #else
+    #error "Neither LITTLE_ENDIAN nor BIG_ENDIAN are defined. Define one of them."
+  #endif
 #endif
 
 #if defined(LITTLE_ENDIAN) && defined(BIG_ENDIAN)
-#if defined(BYTE_ORDER) && BYTE_ORDER == BIG_ENDIAN
-#undef LITTLE_ENDIAN
-#elif defined(BYTE_ORDER) && BYTE_ORDER == LITTLE_ENDIAN
-#undef BIG_ENDIAN
-#else
-#error "Both LITTLE_ENDIAN and BIG_ENDIAN are defined. Undef one of them."
-#endif
+  #if defined(BYTE_ORDER) && BYTE_ORDER == BIG_ENDIAN
+    #undef LITTLE_ENDIAN
+  #elif defined(BYTE_ORDER) && BYTE_ORDER == LITTLE_ENDIAN
+    #undef BIG_ENDIAN
+  #else
+    #error "Both LITTLE_ENDIAN and BIG_ENDIAN are defined. Undef one of them."
+  #endif
 #endif
 
 #if !defined(BIG_ENDIAN) && defined(_WIN_ALL) || defined(__i386__) || defined(__x86_64__)

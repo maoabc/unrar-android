@@ -100,6 +100,7 @@ void uiMsgStore::Msg()
       Log(Str[0],St(MWrongPassword));
       break;
     case UIERROR_MEMORY:
+      mprintf(L"\n");
       Log(NULL,St(MErrOutMem));
       break;
     case UIERROR_FILEOPEN:
@@ -123,6 +124,9 @@ void uiMsgStore::Msg()
 #ifndef SFX_MODULE
     case UIERROR_FILEDELETE:
       Log(Str[0],St(MCannotDelete),Str[1]);
+      break;
+    case UIERROR_RECYCLEFAILED:
+      Log(Str[0],St(MRecycleFailed));
       break;
     case UIERROR_FILERENAME:
       Log(Str[0],St(MErrRename),Str[1],Str[2]);
@@ -231,7 +235,7 @@ void uiMsgStore::Msg()
       Log(Str[0],St(MUnknownExtra),Str[1]);
       break;
     case UIERROR_CORRUPTEXTRA:
-      Log(Str[0],St(MUnknownExtra),Str[1],Str[2]);
+      Log(Str[0],St(MCorruptExtra),Str[1],Str[2]);
       break;
 #endif
 #if !defined(SFX_MODULE) && defined(_WIN_ALL)
@@ -339,7 +343,10 @@ void uiMsgStore::Msg()
 
 bool uiGetPassword(UIPASSWORD_TYPE Type,const wchar *FileName,SecPassword *Password)
 {
-  return GetConsolePassword(Type,FileName,Password);
+  // Unlike GUI we cannot provide Cancel button here, so we use the empty
+  // password to abort. Otherwise user not knowing a password would need to
+  // press Ctrl+C multiple times to quit from infinite password request loop.
+  return GetConsolePassword(Type,FileName,Password) && Password->IsSet();
 }
 
 

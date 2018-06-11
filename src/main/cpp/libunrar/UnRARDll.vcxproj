@@ -352,7 +352,7 @@
     <ClCompile Include="extinfo.cpp" />
     <ClCompile Include="extract.cpp" />
     <ClCompile Include="filcreat.cpp" />
-    <ClCompile Include="virtualFile.cpp" />
+    <ClCompile Include="file.cpp" />
     <ClCompile Include="filefn.cpp" />
     <ClCompile Include="filestr.cpp" />
     <ClCompile Include="find.cpp" />

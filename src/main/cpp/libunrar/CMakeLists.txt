@@ -12,6 +12,7 @@ set (unrar_SOURCES
 		filcreat.cpp
 		archive.cpp
 		arcread.cpp
+		arcmem.cpp
 		unicode.cpp
 		system.cpp
 		isnt.cpp
@@ -53,7 +54,7 @@ set (unrar_SOURCES
 #set(LOCAL_MODULE_TAGS eng debug)
 #set(LOCAL_LDLAGS "${LOCAL_LDLAGS} -pie -fPIE")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRARDLL -DLITTLE_ENDIAN -DRAR_SMP -fPIC -fexceptions -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -UALLOW_EXCEPTIONS")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DRARDLL -DLITTLE_ENDIAN -DRAR_SMP -fPIC -fexceptions -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -UALLOW_EXCEPTIONS ")
 add_library(static_unrar STATIC
             ${unrar_SOURCES})
 
