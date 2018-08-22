@@ -1,19 +1,25 @@
 //
 // Created by mao on 17-6-4.
 //
-#include <jni.h>
+#include "jni.h"
 #include <string.h>
-#include "libunrar/rar.hpp"
-#include "libunrar/dll.hpp"
+#include "rar.hpp"
+#include "dll.hpp"
 #include "jni_util.h"
-#include "jlong.h"
+
+#include <android/log.h>
+
+#define  LOG_TAG    "libunrar-jni"
+#define  LOGI(...)  __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define  LOGE(...)  __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 struct user_data {
     JNIEnv *env;
-    jobject output;
+    jobject callback;
+    jbyteArray readbuf;
 };
 static jfieldID entry_field_name;
 static jfieldID entry_field_size;
@@ -23,26 +29,29 @@ static jfieldID entry_field_crc;
 static jfieldID entry_field_flags;
 static jmethodID entry_method_constructor;
 
-static jmethodID output_write_method;
+static jmethodID callback_process_data;
+static jmethodID callback_need_password;
 
 JNIEXPORT void JNICALL Java_mao_archive_unrar_RarFile_initIDs
         (JNIEnv *env, jclass jcls) {
-    jclass entry_cls = 0;
-    jclass output_cls = 0;
+    jclass entry_cls = NULL;
+    jclass callback_cls = NULL;
 
     if (env->EnsureLocalCapacity(2) < 0)
         goto done;
 
     entry_cls = env->FindClass("mao/archive/unrar/RarEntry");
-    if (entry_cls == 0)
+    if (entry_cls == NULL)
         goto done;
 
 
-    output_cls = env->FindClass("java/io/OutputStream");
-    if (output_cls == 0)
+    callback_cls = env->FindClass("mao/archive/unrar/UnrarCallback");
+    if (callback_cls == NULL)
         goto done;
 
-    output_write_method = env->GetMethodID(output_cls, "write", "([BII)V");
+    callback_process_data = env->GetMethodID(callback_cls, "processData", "([BII)Z");
+
+    callback_need_password = env->GetMethodID(callback_cls, "needPassword", "()Ljava/lang/String;");
 
     entry_field_name = env->GetFieldID(entry_cls, "name", "Ljava/lang/String;");
     entry_field_mtime = env->GetFieldID(entry_cls, "mtime", "J");
@@ -54,9 +63,9 @@ JNIEXPORT void JNICALL Java_mao_archive_unrar_RarFile_initIDs
     entry_method_constructor = env->GetMethodID(entry_cls, "<init>", "()V");
     done:
     env->DeleteLocalRef(entry_cls);
-    env->DeleteLocalRef(output_cls);
+    env->DeleteLocalRef(callback_cls);
 }
-wchar_t *jcharntowcs(wchar_t *dest, const jchar *src, size_t len) {
+inline wchar_t *jcharntowcs(wchar *dest, const jchar *src, size_t len) {
     if (dest == NULL || src == NULL)
         return NULL;
     size_t i = 0;
@@ -68,7 +77,7 @@ wchar_t *jcharntowcs(wchar_t *dest, const jchar *src, size_t len) {
 
     return dest;
 }
-jchar *wcsntojchar(jchar *dest, const wchar_t *src, size_t len) {
+inline jchar *wcsntojchar(jchar *dest, const wchar *src, size_t len) {
     if (dest == NULL || src == NULL)
         return NULL;
     size_t i = 0;
@@ -80,20 +89,73 @@ jchar *wcsntojchar(jchar *dest, const wchar_t *src, size_t len) {
     return dest;
 }
 
+int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
+    struct user_data *data = (struct user_data *) UserData;
+    switch (msg) {
+        case UCM_PROCESSDATA: {
+            JNIEnv *env = data->env;
+            const jbyte *buf = (const jbyte *) P1;
+
+            for (jsize readed = 0, rem = (jsize) P2, len = env->GetArrayLength(data->readbuf);
+                 rem > 0; readed += len, rem -= len) {
+                if (len > rem) {
+                    len = rem;
+                }
+                env->SetByteArrayRegion(data->readbuf, 0, len, buf + readed);
+
+                if (!env->CallBooleanMethod(data->callback, callback_process_data,
+                                            data->readbuf, 0, len)) {
+                    return -1;
+
+                }
+
+                if (env->ExceptionCheck()) {
+                    return -1;
+                }
+            }
+            return 1;
+        }
+        case UCM_NEEDPASSWORDW: {
+            LOGI("need password");
+            JNIEnv *env = data->env;
+            jstring jpassword = (jstring) env->CallObjectMethod(data->callback,
+                                                                callback_need_password);
+            if (jpassword != NULL) {
+                wchar *password = (wchar *) P1;
+                const jchar *chars = env->GetStringChars(jpassword, 0);
+                jcharntowcs(password, chars, Min(env->GetStringLength(jpassword), P2));
+                //保证字符串正确终止
+                password[P2 - 1] = '\0';
+                env->ReleaseStringChars(jpassword, chars);
+                return 1;
+            }
+            return -1;
+        }
+        case UCM_CHANGEVOLUMEW: {
+            //TODO 缺少卷调用回调java层
+            LOGI("volume %d", P2);
+            return -1;
+        }
+        default:
+            break;
+    }
+    return 1;
+}
+
 JNIEXPORT jlong JNICALL Java_mao_archive_unrar_RarFile_openArchive
-        (JNIEnv *env, jclass jcls, jstring jfilePath, jint mode, jbooleanArray jencrypted) {
+        (JNIEnv *env, jclass jcls, jstring jfilePath, jint mode) {
+    wchar nameW[NM];
     struct RAROpenArchiveDataEx data;
+
     memset(&data, 0, sizeof(data));
 
-    const jchar *filePath = env->GetStringChars(jfilePath, 0);
-    jsize len = env->GetStringLength(jfilePath);
-
-    wchar_t nameW[NM];
-    jcharntowcs(nameW, filePath, (size_t) len);
-    env->ReleaseStringChars(jfilePath, filePath);
+    const jchar *path = env->GetStringChars(jfilePath, 0);
+    jcharntowcs(nameW, path, (size_t) env->GetStringLength(jfilePath));
+    env->ReleaseStringChars(jfilePath, path);
 
     data.ArcNameW = nameW;
     data.OpenMode = (unsigned int) mode;
+
     HANDLE handle = RAROpenArchiveEx(&data);
 
     if (handle == NULL || data.OpenResult) {
@@ -101,23 +163,29 @@ JNIEXPORT jlong JNICALL Java_mao_archive_unrar_RarFile_openArchive
             RARCloseArchive(handle);
         }
         char err_str[128];
-        sprintf(err_str, "RAROpenArchiveEx ErrorCode: %d", data.OpenResult);
+        sprintf(err_str, "ErrorCode: %d", data.OpenResult);
         JNU_ThrowByName(env, "mao/archive/unrar/RarException", err_str);
-        return -1;
-    }
-    if (jencrypted != NULL) {
-        //检查文件名是否被加密
-        jboolean encrypted = (jboolean) ((data.Flags & 0x80) == 0x80);
-        env->SetBooleanArrayRegion(jencrypted, 0, 1, &encrypted);
+        return 0;
     }
     return ptr_to_jlong(handle);
 }
-JNIEXPORT jobject JNICALL Java_mao_archive_unrar_RarFile_readHeader
-        (JNIEnv *env, jclass jcls, jlong jhandle) {
+
+
+JNIEXPORT jobject JNICALL Java_mao_archive_unrar_RarFile_readHeader0
+        (JNIEnv *env, jclass jcls, jlong jhandle, jobject callback) {
     jobject entry = NULL;
     jclass entry_cls = NULL;
 
     HANDLE handle = jlong_to_ptr(jhandle);
+
+    if (callback != NULL) {
+        struct user_data userData;
+        userData.env = env;
+        userData.callback = callback;
+        //需要密码回调
+        RARSetCallback(handle, callbackFunc, (LPARAM) &userData);
+    }
+
 
     struct RARHeaderDataEx header;
     memset(&header, 0, sizeof(struct RARHeaderDataEx));
@@ -141,11 +209,14 @@ JNIEXPORT jobject JNICALL Java_mao_archive_unrar_RarFile_readHeader
     jchar name[1024];
     size_t len = wcslen(header.FileNameW);
     wcsntojchar(name, header.FileNameW, len);
+
     jstring string = env->NewString(name, (jsize) len);
     env->SetObjectField(entry, entry_field_name, string);
 
-    env->SetLongField(entry, entry_field_size, (((int64) header.UnpSizeHigh) << 32) | header.UnpSize);
-    env->SetLongField(entry, entry_field_csize, (((int64) header.PackSizeHigh) << 32) | header.PackSize);
+    env->SetLongField(entry, entry_field_size,
+                      (((int64) header.UnpSizeHigh) << 32) | header.UnpSize);
+    env->SetLongField(entry, entry_field_csize,
+                      (((int64) header.PackSizeHigh) << 32) | header.PackSize);
     env->SetLongField(entry, entry_field_mtime, ((int64) header.FileTime));
     env->SetLongField(entry, entry_field_crc, header.FileCRC);
     env->SetIntField(entry, entry_field_flags, header.Flags);
@@ -153,78 +224,66 @@ JNIEXPORT jobject JNICALL Java_mao_archive_unrar_RarFile_readHeader
     return entry;
 }
 
-JNIEXPORT jobject JNICALL Java_mao_archive_unrar_RarFile_readHeaderSkipData
-        (JNIEnv *env, jclass jcls, jlong jhandle) {
-    jobject header = Java_mao_archive_unrar_RarFile_readHeader(env, jcls, jhandle);
-    if (header == NULL) {
-        return NULL;
-    }
+JNIEXPORT void JNICALL Java_mao_archive_unrar_RarFile_processFile0
+        (JNIEnv *env, jclass jcls, jlong jhandle, jint operation, jstring jdestPath,
+         jstring jdestName, jobject callback) {
+#define MAXBUF 1024*16
     HANDLE handle = jlong_to_ptr(jhandle);
-    RARProcessFileW(handle, RAR_SKIP, NULL, NULL);
-    return header;
+    jbyteArray readbuf = NULL;
 
-}
+    wchar destPath[NM], destName[NM];
 
-int CALLBACK callbackData(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
-    user_data *data = (user_data *) UserData;
-    JNIEnv *env = data->env;
-    switch (msg) {
-        case UCM_PROCESSDATA: {
-            jsize len = (jsize) P2;
-            jbyteArray array = env->NewByteArray(len);
-            env->SetByteArrayRegion(array, 0, len, (const jbyte *) P1);
-            env->CallVoidMethod(data->output, output_write_method, array, 0, len);
-            env->DeleteLocalRef(array);
-            if (env->ExceptionCheck()) {
-                return -1;
-            }
-            return 1;
-        }
-        default:
-            break;
-    }
-    return 1;
-}
+    memset(destPath, 0, sizeof(wchar) * NM);
+    memset(destName, 0, sizeof(wchar) * NM);
 
-JNIEXPORT jint JNICALL Java_mao_archive_unrar_RarFile_readData
-        (JNIEnv *env, jclass jcls, jlong jhandle, jstring jdestPath,
-         jobject output) {
-    HANDLE handle = jlong_to_ptr(jhandle);
     if (jdestPath != NULL) {
-        wchar_t destPath[NM];
         const jchar *chars = env->GetStringChars(jdestPath, 0);
-        jsize len = env->GetStringLength(jdestPath);
-        jcharntowcs(destPath, chars, (size_t) len);
+        jcharntowcs(destPath, chars, (size_t) env->GetStringLength(jdestPath));
         env->ReleaseStringChars(jdestPath, chars);
-        return RARProcessFileW(handle, RAR_EXTRACT, destPath, NULL);
     }
-    if (output != NULL) {
+
+    if (jdestName != NULL) {
+        const jchar *chars = env->GetStringChars(jdestName, 0);
+        jcharntowcs(destName, chars, (size_t) env->GetStringLength(jdestName));
+        env->ReleaseStringChars(jdestName, chars);
+    }
+
+    if (callback != NULL) {//UCM_PROCESSDATA
+        readbuf = env->NewByteArray(MAXBUF);
+
         struct user_data userData;
         userData.env = env;
-        userData.output = output;
-        RARSetCallback(handle, callbackData, (LPARAM) &userData);
-        return RARProcessFileW(handle, RAR_TEST, NULL, NULL);
+        userData.callback = callback;
+        userData.readbuf = readbuf;
+        RARSetCallback(handle, callbackFunc, (LPARAM) &userData);
     }
-    return RARProcessFileW(handle, RAR_SKIP, NULL, NULL);
+    int code = RARProcessFileW(handle, operation, destPath, destName);
 
-}
-
-
-JNIEXPORT void JNICALL Java_mao_archive_unrar_RarFile_setPassword
-        (JNIEnv *env, jclass jcls, jlong jhandle, jstring jpasswd) {
-    if (jpasswd == NULL) {
-        return;
+    if (readbuf != NULL) {
+        env->DeleteLocalRef(readbuf);
     }
-    HANDLE handle = jlong_to_ptr(jhandle);
-    const char *passwd = env->GetStringUTFChars(jpasswd, 0);
-    RARSetPassword(handle, (char *) passwd);
-    env->ReleaseStringUTFChars(jpasswd, passwd);
+    LOGI("operation %d,process result %d", operation, code);
+    //检查异常
+    switch (code) {
+        case ERAR_SUCCESS:
+            break;
+        case ERAR_BAD_PASSWORD:
+            JNU_ThrowIOException(env, "Bad password");
+            break;
+        case ERAR_MISSING_PASSWORD:
+            JNU_ThrowIOException(env, "Missing password");
+            break;
+        default:
+            JNU_ThrowIOException(env, "");
+    }
 }
 
 JNIEXPORT void JNICALL Java_mao_archive_unrar_RarFile_closeArchive
         (JNIEnv *env, jclass jcls, jlong jhandle) {
     HANDLE handle = jlong_to_ptr(jhandle);
-    RARCloseArchive(handle);
+    if (RARCloseArchive(handle) != ERAR_SUCCESS) {
+        JNU_ThrowIOExceptionWithLastError(env, "close error");
+    }
 }
 
 #ifdef __cplusplus

@@ -5,5 +5,5 @@ package mao.archive.unrar;
  * Created by mao on 17-6-7.
  */
 public interface ExtractFilter {
-    boolean filter(RarEntry entry);
+    boolean accepts(RarEntry entry);
 }

@@ -13,6 +13,12 @@ extern "C" {
 #define mao_archive_unrar_RarFile_RAR_OM_EXTRACT 1L
 #undef mao_archive_unrar_RarFile_RAR_OM_LIST_INCSPLIT
 #define mao_archive_unrar_RarFile_RAR_OM_LIST_INCSPLIT 2L
+#undef mao_archive_unrar_RarFile_RAR_SKIP
+#define mao_archive_unrar_RarFile_RAR_SKIP 0L
+#undef mao_archive_unrar_RarFile_RAR_TEST
+#define mao_archive_unrar_RarFile_RAR_TEST 1L
+#undef mao_archive_unrar_RarFile_RAR_EXTRACT
+#define mao_archive_unrar_RarFile_RAR_EXTRACT 2L
 /*
  * Class:     mao_archive_unrar_RarFile
  * Method:    initIDs
@@ -24,42 +30,26 @@ JNIEXPORT void JNICALL Java_mao_archive_unrar_RarFile_initIDs
 /*
  * Class:     mao_archive_unrar_RarFile
  * Method:    openArchive
- * Signature: (Ljava/lang/String;I[Z)J
+ * Signature: (Ljava/lang/String;I)J
  */
 JNIEXPORT jlong JNICALL Java_mao_archive_unrar_RarFile_openArchive
-  (JNIEnv *, jclass, jstring, jint, jbooleanArray);
+  (JNIEnv *, jclass, jstring, jint);
 
 /*
  * Class:     mao_archive_unrar_RarFile
- * Method:    readHeader
- * Signature: (J)Lmao/archive/unrar/RarEntry;
+ * Method:    readHeader0
+ * Signature: (JLmao/archive/unrar/UnrarCallback;)Lmao/archive/unrar/RarEntry;
  */
-JNIEXPORT jobject JNICALL Java_mao_archive_unrar_RarFile_readHeader
-  (JNIEnv *, jclass, jlong);
+JNIEXPORT jobject JNICALL Java_mao_archive_unrar_RarFile_readHeader0
+  (JNIEnv *, jclass, jlong, jobject);
 
 /*
  * Class:     mao_archive_unrar_RarFile
- * Method:    readHeaderSkipData
- * Signature: (J)Lmao/archive/unrar/RarEntry;
+ * Method:    processFile0
+ * Signature: (JILjava/lang/String;Ljava/lang/String;Lmao/archive/unrar/UnrarCallback;)V
  */
-JNIEXPORT jobject JNICALL Java_mao_archive_unrar_RarFile_readHeaderSkipData
-  (JNIEnv *, jclass, jlong);
-
-/*
- * Class:     mao_archive_unrar_RarFile
- * Method:    setPassword
- * Signature: (JLjava/lang/String;)V
- */
-JNIEXPORT void JNICALL Java_mao_archive_unrar_RarFile_setPassword
-  (JNIEnv *, jclass, jlong, jstring);
-
-/*
- * Class:     mao_archive_unrar_RarFile
- * Method:    readData
- * Signature: (JLjava/lang/String;Ljava/io/OutputStream;)I
- */
-JNIEXPORT jint JNICALL Java_mao_archive_unrar_RarFile_readData
-  (JNIEnv *, jclass, jlong, jstring, jobject);
+JNIEXPORT void JNICALL Java_mao_archive_unrar_RarFile_processFile0
+  (JNIEnv *, jclass, jlong, jint, jstring, jstring, jobject);
 
 /*
  * Class:     mao_archive_unrar_RarFile
