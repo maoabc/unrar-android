@@ -2,7 +2,6 @@ apply plugin: 'com.android.library'
 
 android {
     compileSdkVersion build_versions.target_sdk
-    buildToolsVersion build_versions.build_tools
 
     defaultConfig {
 
@@ -10,12 +9,12 @@ android {
         targetSdkVersion build_versions.target_sdk
         versionCode 1
         versionName "1.0"
-        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         externalNativeBuild {
             cmake {
                 abiFilters 'armeabi-v7a', 'x86'
-                arguments "-DANDROID_STL=gnustl_static"
+                arguments "-DANDROID_STL=c++_static"
             }
         }
     }
@@ -34,10 +33,10 @@ android {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
-    androidTestImplementation('com.android.support.test.espresso:espresso-core:2.2.2', {
+    androidTestImplementation('androidx.test.espresso:espresso-core:3.1.0-alpha4', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
-    implementation deps.support.app_compat
+    implementation 'androidx.appcompat:appcompat:1.0.0'
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.ow2.asm:asm:6.2'
 }
