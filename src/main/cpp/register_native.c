@@ -29,7 +29,7 @@ static JNINativeMethod methods[]={
 
 
 static jboolean registerNativeMethods(JNIEnv* env) {
-    jclass clazz = (*env)->FindClass(env, CLASS_NAME);
+    jclass clazz = (*env)->FindClass(env, "mao/archive/unrar/RarFile");
     if (clazz == NULL) {
         return JNI_FALSE;
     }
