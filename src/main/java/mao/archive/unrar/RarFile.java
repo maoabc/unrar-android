@@ -1,13 +1,13 @@
 package mao.archive.unrar;
 
-import androidx.annotation.NonNull;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
+
+import androidx.annotation.NonNull;
 
 /**
  * Created by mao on 16-10-9.
@@ -141,7 +141,7 @@ public class RarFile {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         extract(entry, new UnrarCallback() {
             @Override
-            public boolean processData(byte[] b, int off, int len) throws IOException {
+            public boolean processData(byte[] b, int off, int len) {
                 out.write(b, off, len);
                 return true;
             }

@@ -34,19 +34,19 @@ static jmethodID callback_need_password;
 
 JNIEXPORT void JNICALL Java_mao_archive_unrar_RarFile_initIDs
         (JNIEnv *env, jclass jcls) {
-    jclass entry_cls = NULL;
-    jclass callback_cls = NULL;
+    jclass entry_cls = nullptr;
+    jclass callback_cls = nullptr;
 
     if (env->EnsureLocalCapacity(2) < 0)
         goto done;
 
     entry_cls = env->FindClass("mao/archive/unrar/RarEntry");
-    if (entry_cls == NULL)
+    if (entry_cls == nullptr)
         goto done;
 
 
     callback_cls = env->FindClass("mao/archive/unrar/UnrarCallback");
-    if (callback_cls == NULL)
+    if (callback_cls == nullptr)
         goto done;
 
     callback_process_data = env->GetMethodID(callback_cls, "processData", "([BII)Z");
@@ -66,8 +66,8 @@ JNIEXPORT void JNICALL Java_mao_archive_unrar_RarFile_initIDs
     env->DeleteLocalRef(callback_cls);
 }
 inline wchar_t *jcharntowcs(wchar *dest, const jchar *src, size_t len) {
-    if (dest == NULL || src == NULL)
-        return NULL;
+    if (dest == nullptr || src == nullptr)
+        return nullptr;
     size_t i = 0;
     for (; i < len && src[i] != '\0'; i++) {
         dest[i] = src[i];
@@ -78,8 +78,8 @@ inline wchar_t *jcharntowcs(wchar *dest, const jchar *src, size_t len) {
     return dest;
 }
 inline jchar *wcsntojchar(jchar *dest, const wchar *src, size_t len) {
-    if (dest == NULL || src == NULL)
-        return NULL;
+    if (dest == nullptr || src == nullptr)
+        return nullptr;
     size_t i = 0;
     for (; i < len && src[i] != '\0'; i++) {
         dest[i] = (jchar) src[i];
@@ -108,10 +108,6 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
                     return -1;
 
                 }
-
-                if (env->ExceptionCheck()) {
-                    return -1;
-                }
             }
             return 1;
         }
@@ -120,7 +116,7 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
             JNIEnv *env = data->env;
             jstring jpassword = (jstring) env->CallObjectMethod(data->callback,
                                                                 callback_need_password);
-            if (jpassword != NULL) {
+            if (jpassword != nullptr) {
                 wchar *password = (wchar *) P1;
                 const jchar *chars = env->GetStringChars(jpassword, 0);
                 jcharntowcs(password, chars, Min(env->GetStringLength(jpassword), P2));
@@ -133,7 +129,7 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
         }
         case UCM_CHANGEVOLUMEW: {
             //TODO 缺少卷调用回调java层
-            LOGI("volume %d", P2);
+            LOGI("volume %s %d", P1, P2);
             return -1;
         }
         default:
@@ -190,20 +186,20 @@ JNIEXPORT jobject JNICALL Java_mao_archive_unrar_RarFile_readHeader0
     struct RARHeaderDataEx header;
     memset(&header, 0, sizeof(struct RARHeaderDataEx));
     if (RARReadHeaderEx(handle, &header)) {
-        return NULL;
+        return nullptr;
     }
 
     if (env->EnsureLocalCapacity(2) < 0)
-        return NULL;
+        return nullptr;
     entry_cls = env->FindClass("mao/archive/unrar/RarEntry");
-    if (entry_cls == NULL) {
-        return NULL;
+    if (entry_cls == nullptr) {
+        return nullptr;
     }
 
     entry = env->NewObject(entry_cls, entry_method_constructor);
     env->DeleteLocalRef(entry_cls);
-    if (entry == NULL) {
-        return NULL;
+    if (entry == nullptr) {
+        return nullptr;
     }
 
     jchar name[1024];
@@ -214,9 +210,9 @@ JNIEXPORT jobject JNICALL Java_mao_archive_unrar_RarFile_readHeader0
     env->SetObjectField(entry, entry_field_name, string);
 
     env->SetLongField(entry, entry_field_size,
-                      (((int64) header.UnpSizeHigh) << 32) | header.UnpSize);
+                      ((uint64_t) header.UnpSizeHigh << 32) | header.UnpSize);
     env->SetLongField(entry, entry_field_csize,
-                      (((int64) header.PackSizeHigh) << 32) | header.PackSize);
+                      (((uint64_t) header.PackSizeHigh) << 32) | header.PackSize);
     env->SetLongField(entry, entry_field_mtime, ((int64) header.FileTime));
     env->SetLongField(entry, entry_field_crc, header.FileCRC);
     env->SetIntField(entry, entry_field_flags, header.Flags);
@@ -224,31 +220,31 @@ JNIEXPORT jobject JNICALL Java_mao_archive_unrar_RarFile_readHeader0
     return entry;
 }
 
+#define MAXBUF (1024*16)
 JNIEXPORT void JNICALL Java_mao_archive_unrar_RarFile_processFile0
         (JNIEnv *env, jclass jcls, jlong jhandle, jint operation, jstring jdestPath,
          jstring jdestName, jobject callback) {
-#define MAXBUF 1024*16
     HANDLE handle = jlong_to_ptr(jhandle);
-    jbyteArray readbuf = NULL;
+    jbyteArray readbuf = nullptr;
 
     wchar destPath[NM], destName[NM];
 
     memset(destPath, 0, sizeof(wchar) * NM);
     memset(destName, 0, sizeof(wchar) * NM);
 
-    if (jdestPath != NULL) {
+    if (jdestPath != nullptr) {
         const jchar *chars = env->GetStringChars(jdestPath, 0);
         jcharntowcs(destPath, chars, (size_t) env->GetStringLength(jdestPath));
         env->ReleaseStringChars(jdestPath, chars);
     }
 
-    if (jdestName != NULL) {
+    if (jdestName != nullptr) {
         const jchar *chars = env->GetStringChars(jdestName, 0);
         jcharntowcs(destName, chars, (size_t) env->GetStringLength(jdestName));
         env->ReleaseStringChars(jdestName, chars);
     }
 
-    if (callback != NULL) {//UCM_PROCESSDATA
+    if (callback != nullptr) {//UCM_PROCESSDATA
         readbuf = env->NewByteArray(MAXBUF);
 
         struct user_data userData;
@@ -259,7 +255,7 @@ JNIEXPORT void JNICALL Java_mao_archive_unrar_RarFile_processFile0
     }
     int code = RARProcessFileW(handle, operation, destPath, destName);
 
-    if (readbuf != NULL) {
+    if (readbuf != nullptr) {
         env->DeleteLocalRef(readbuf);
     }
     LOGI("operation %d,process result %d", operation, code);
