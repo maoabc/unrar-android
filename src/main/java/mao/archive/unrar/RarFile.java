@@ -164,7 +164,7 @@ public class RarFile {
     public void extractAll(String destPath, UnrarCallback callback) throws IOException {
         extractBatch(destPath, callback, new ExtractFilter() {
             @Override
-            public boolean accepts(RarEntry entry) {
+            public boolean accept(RarEntry entry) {
                 return true;
             }
         });
@@ -183,7 +183,7 @@ public class RarFile {
         try {
             RarEntry header;
             while ((header = readHeader0(handle, callback)) != null) {
-                if (filter != null && filter.accepts(header)) {
+                if (filter != null && filter.accept(header)) {
                     processFile0(handle, RAR_EXTRACT, destPath, null, null);
                 } else {
                     processFile0(handle, RAR_SKIP, null, null, null);
