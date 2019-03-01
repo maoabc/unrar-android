@@ -128,6 +128,9 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
             return -1;
         }
         case UCM_CHANGEVOLUMEW: {
+            if (P2 == RAR_VOL_NOTIFY) {
+                return 0;
+            }
             //TODO 缺少卷调用回调java层
             LOGI("volume %s %d", P1, P2);
             return -1;
