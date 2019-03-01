@@ -13,14 +13,20 @@ public class RarEntry {
     public static final int RHDF_SOLID = 0x10;
     public static final int RHDF_DIRECTORY = 0x20;
 
-    private String name;
-    private long size;  //uncompressed size of entry data unpsize
-    private long csize;    // compressed size of entry data packSize
-    private long crc;
-    private long mtime = -1;
-    private int flags;
+    private final String name;
+    private final long size;  //uncompressed size of entry data unpsize
+    private final long csize;    // compressed size of entry data packSize
+    private final long crc;
+    private final long mtime;
+    private final int flags;
 
-    private RarEntry() {
+    private RarEntry(String name, long size, long csize, long crc, long mtime, int flags) {
+        this.name = name;
+        this.size = size;
+        this.csize = csize;
+        this.crc = crc;
+        this.mtime = dosToJavaTime(mtime);
+        this.flags = flags;
     }
 
     public String getName() {
@@ -39,8 +45,8 @@ public class RarEntry {
         return crc;
     }
 
-    public long getMtime() {
-        return mtime == -1 ? 0 : dosToJavaTime(mtime);
+    public long getTime() {
+        return mtime;
     }
 
     /*

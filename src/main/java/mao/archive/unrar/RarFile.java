@@ -28,7 +28,6 @@ public class RarFile {
 
     static {
         System.loadLibrary("unrar-jni");
-        initIDs();
     }
 
     //只能判断rar文件名是否加密,如果只加密数据还要根据头进一部判断
@@ -195,7 +194,6 @@ public class RarFile {
     }
 
 
-    private static native void initIDs();
 
 
     private static native long openArchive(String rarName, int mode) throws RarException;
