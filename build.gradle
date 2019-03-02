@@ -34,9 +34,10 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     androidTestImplementation('androidx.test.espresso:espresso-core:3.1.0-alpha4', {
-        exclude group: 'com.android.support', module: 'support-annotations'
+        exclude group: 'androidx.annotation', module: 'annotation'
     })
-    implementation 'androidx.appcompat:appcompat:1.0.0'
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.ow2.asm:asm:6.2'
+
+    implementation "androidx.annotation:annotation:${versions.annotationx}"
 }
