@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
 
+import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
 
 /**
@@ -196,15 +197,19 @@ public class RarFile {
 
 
 
+    @Keep
     private static native long openArchive(String rarName, int mode) throws RarException;
 
     //读取rar头
+    @Keep
     private static native RarEntry readHeader0(long handle, UnrarCallback callback);
 
 
+    @Keep
     private static native void processFile0(long handle, int operation, String destPath, String destName, UnrarCallback callback) throws IOException;
 
 
+    @Keep
     private static native void closeArchive(long handle) throws IOException;
 
 

@@ -2,10 +2,13 @@ package mao.archive.unrar;
 
 import java.util.Date;
 
+import androidx.annotation.Keep;
+
 /**
  * Created by mao on 16-10-9.
  */
 
+@Keep
 public class RarEntry {
     public static final int RHDF_SPLITBEFORE = 0x01;
     public static final int RHDF_SPLITAFTER = 0x02;

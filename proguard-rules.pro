@@ -23,3 +23,5 @@
 # If you keep the line number information, uncomment this to
 # hide the original source virtualFile name.
 #-renamesourcefileattribute SourceFile
+
+-keep class mao.archive.unrar.* {*;}
