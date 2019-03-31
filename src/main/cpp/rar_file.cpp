@@ -215,6 +215,8 @@ static void Java_mao_archive_unrar_RarFile_processFile0
         userData.callback = callback;
         userData.readbuf = readbuf;
         RARSetCallback(handle, callbackFunc, (LPARAM) &userData);
+    } else {
+        RARSetCallback(handle, nullptr, (LPARAM) nullptr);
     }
     int code = RARProcessFileW(handle, operation, destPath, destName);
 

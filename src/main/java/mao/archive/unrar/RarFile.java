@@ -195,8 +195,6 @@ public class RarFile {
     }
 
 
-
-
     @Keep
     private static native long openArchive(String rarName, int mode) throws RarException;
 
