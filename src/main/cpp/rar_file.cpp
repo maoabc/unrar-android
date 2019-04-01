@@ -99,7 +99,8 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
             if (jpassword != nullptr) {
                 wchar_t *password = (wchar *) P1;
                 const jchar *chars = data->env->GetStringChars(jpassword, nullptr);
-                jcharntowcs(password, chars, Min(data->env->GetStringLength(jpassword), P2));
+                jcharntowcs(password, chars,
+                            static_cast<size_t >(Min(data->env->GetStringLength(jpassword), P2)));
                 //保证字符串正确终止
                 password[P2 - 1] = '\0';
                 data->env->ReleaseStringChars(jpassword, chars);
@@ -112,7 +113,7 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
                 return 0;
             }
             //TODO 缺少卷调用,回调java层
-            LOGI("volume %d", P2);
+//            LOGI("volume %d", P2);
             return -1;
         }
         default:
@@ -156,15 +157,17 @@ static jobject Java_mao_archive_unrar_RarFile_readHeader0
     HANDLE handle = jlong_to_ptr(jhandle);
 
     if (callback != nullptr) {
-        struct user_data userData;
+        struct user_data userData{};
         userData.env = env;
         userData.callback = callback;
         //需要密码回调
         RARSetCallback(handle, callbackFunc, (LPARAM) &userData);
+    } else {
+        RARSetCallback(handle, nullptr, (LPARAM) nullptr);
     }
 
 
-    struct RARHeaderDataEx header;
+    struct RARHeaderDataEx header{};
     memset(&header, 0, sizeof(struct RARHeaderDataEx));
     if (RARReadHeaderEx(handle, &header)) {
         return nullptr;
