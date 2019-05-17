@@ -147,19 +147,20 @@ static jlong Java_mao_archive_unrar_RarFile_openArchive
         JNU_ThrowByName(env, "mao/archive/unrar/RarException", err_str);
         return 0;
     }
-    return ptr_to_jlong(handle);
+    return reinterpret_cast<jlong>(handle);
 }
 
 
 static jobject Java_mao_archive_unrar_RarFile_readHeader0
         (JNIEnv *env, jclass jcls, jlong jhandle, jobject callback) {
 
-    HANDLE handle = jlong_to_ptr(jhandle);
+    struct user_data userData{};
+
+    HANDLE handle = reinterpret_cast<void *>(jhandle);
 
     if (callback != nullptr) {
-        struct user_data userData{};
         userData.env = env;
-        userData.callback = callback;
+        userData.callback = env->NewGlobalRef(callback);
         //需要密码回调
         RARSetCallback(handle, callbackFunc, (LPARAM) &userData);
     } else {
@@ -171,6 +172,10 @@ static jobject Java_mao_archive_unrar_RarFile_readHeader0
     memset(&header, 0, sizeof(struct RARHeaderDataEx));
     if (RARReadHeaderEx(handle, &header)) {
         return nullptr;
+    }
+
+    if (userData.callback) {
+        env->DeleteGlobalRef(userData.callback);
     }
 
     jchar name[1024];
@@ -190,8 +195,8 @@ static jobject Java_mao_archive_unrar_RarFile_readHeader0
 static void Java_mao_archive_unrar_RarFile_processFile0
         (JNIEnv *env, jclass jcls, jlong jhandle, jint operation, jstring jdestPath,
          jstring jdestName, jobject callback) {
-    HANDLE handle = jlong_to_ptr(jhandle);
-    jbyteArray readbuf = nullptr;
+    struct user_data userData{};
+    HANDLE handle = reinterpret_cast<void *>(jhandle);
 
     wchar destPath[NM], destName[NM];
 
@@ -211,20 +216,22 @@ static void Java_mao_archive_unrar_RarFile_processFile0
     }
 
     if (callback != nullptr) {//UCM_PROCESSDATA
-        readbuf = env->NewByteArray(MAXBUF);
-
-        struct user_data userData{};
         userData.env = env;
-        userData.callback = callback;
-        userData.readbuf = readbuf;
+        userData.callback = env->NewGlobalRef(callback);
+
+        userData.readbuf = static_cast<jbyteArray>(env->NewGlobalRef(env->NewByteArray(MAXBUF)));
+
         RARSetCallback(handle, callbackFunc, (LPARAM) &userData);
     } else {
         RARSetCallback(handle, nullptr, (LPARAM) nullptr);
     }
     int code = RARProcessFileW(handle, operation, destPath, destName);
 
-    if (readbuf != nullptr) {
-        env->DeleteLocalRef(readbuf);
+    if (userData.callback) {
+        env->DeleteGlobalRef(userData.callback);
+    }
+    if (userData.readbuf) {
+        env->DeleteGlobalRef(userData.readbuf);
     }
     //检查异常
     switch (code) {
@@ -244,7 +251,7 @@ static void Java_mao_archive_unrar_RarFile_processFile0
 
 static void Java_mao_archive_unrar_RarFile_closeArchive
         (JNIEnv *env, jclass jcls, jlong jhandle) {
-    HANDLE handle = jlong_to_ptr(jhandle);
+    HANDLE handle = reinterpret_cast<void *>(jhandle);
     if (RARCloseArchive(handle) != ERAR_SUCCESS) {
         JNU_ThrowIOExceptionWithLastError(env, "close error");
     }
@@ -270,8 +277,10 @@ jboolean registerNativeMethods(JNIEnv *env) {
         return JNI_FALSE;
     }
     if (env->RegisterNatives(clazz, methods, NELEM(methods)) < 0) {
+        env->DeleteLocalRef(clazz);
         return JNI_FALSE;
     }
+    env->DeleteLocalRef(clazz);
 
     return JNI_TRUE;
 }

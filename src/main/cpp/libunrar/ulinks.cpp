@@ -1,8 +1,6 @@
 
 
-#include "rar.hpp"
-
-static bool UnixSymlink(const char *Target, const wchar *LinkName, RarTime *ftm, RarTime *fta)
+static bool UnixSymlink(const char *Target,const wchar *LinkName,RarTime *ftm,RarTime *fta)
 {
   CreatePath(LinkName,true);
   DelFile(LinkName);

@@ -22,8 +22,22 @@
 
 #ifdef _WIN_ALL
 
-#define STRICT
+
+// We got a report that just "#define STRICT" is incompatible with
+// "#define STRICT 1" in Windows 10 SDK minwindef.h and depending on the order
+// in which these statements are reached this may cause a compiler warning
+// and build break for other projects incorporating this source.
+// So we changed it to "#define STRICT 1".
+#ifndef STRICT
+#define STRICT 1
+#endif
+
+// 'ifndef' check here is needed for unrar.dll header to avoid macro
+// re-definition warnings in third party projects.
+#ifndef UNICODE
 #define UNICODE
+#endif
+
 #undef WINVER
 #undef _WIN32_WINNT
 #define WINVER 0x0501
@@ -132,12 +146,7 @@
   #include <sys/sysctl.h>
 #endif
 #ifndef SFX_MODULE
-  #if defined(__ANDROID__)
-    #include <sys/vfs.h>
-    #define statvfs statfs
-  #else
     #include <sys/statvfs.h>
-  #endif
 #endif
 #include <pwd.h>
 #include <grp.h>
@@ -161,11 +170,9 @@
 #define SAVE_LINKS
 #endif
 
-#if defined(__linux) || defined(__FreeBSD__) || defined(__ANDROID__)
-  #if __ANDROID_API__ >= 26
-    #include <sys/time.h>
-    #define USE_LUTIMES
-  #endif
+#if defined(__linux) || defined(__FreeBSD__)
+#include <sys/time.h>
+#define USE_LUTIMES
 #endif
 
 #define ENABLE_ACCESS
