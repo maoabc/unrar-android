@@ -171,8 +171,10 @@
 #endif
 
 #if defined(__linux) || defined(__FreeBSD__)
+#if __ANDROID_API__ >= 26
 #include <sys/time.h>
 #define USE_LUTIMES
+#endif
 #endif
 
 #define ENABLE_ACCESS
