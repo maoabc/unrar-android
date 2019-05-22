@@ -24,4 +24,4 @@
 # hide the original source virtualFile name.
 #-renamesourcefileattribute SourceFile
 
--keep class mao.archive.unrar.* {*;}
+#-keep class mao.archive.unrar.* {*;}
