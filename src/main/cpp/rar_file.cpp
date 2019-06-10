@@ -198,7 +198,7 @@ static void Java_mao_archive_unrar_RarFile_processFile0
     struct user_data userData{};
     HANDLE handle = reinterpret_cast<void *>(jhandle);
 
-    wchar destPath[NM], destName[NM];
+    wchar_t destPath[NM], destName[NM];
 
     memset(destPath, 0, sizeof(wchar) * NM);
     memset(destName, 0, sizeof(wchar) * NM);
