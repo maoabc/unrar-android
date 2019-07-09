@@ -200,7 +200,7 @@ public class RarFile {
     /**
      * 批量解压数据到某个目录
      *
-     * @param filter   对解压文件进行过滤
+     * @param filter 对解压文件进行过滤
      * @throws IOException
      */
     public void extractBatch2(PasswordCallback passwordCallback, ExtractFilter filter, OnCreateOutCallback outCallback) throws IOException {
@@ -212,9 +212,11 @@ public class RarFile {
             RarEntry header;
             while ((header = readHeader0(handle, passwordCallback)) != null) {
                 if (filter != null && filter.accept(header)) {
-                    try (UnrarCallback out = outCallback.createOut(header.getName());
-                    ) {
-                        processFile0(handle, RAR_TEST, null, null, out);
+                    if (!header.isDirectory()) {
+                        try (UnrarCallback out = outCallback.createOut(header.getName());
+                        ) {
+                            processFile0(handle, RAR_TEST, null, null, out);
+                        }
                     }
                 } else {
                     processFile0(handle, RAR_SKIP, null, null, null);

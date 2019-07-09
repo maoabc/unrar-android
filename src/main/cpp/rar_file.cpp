@@ -87,8 +87,10 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
 
                 data->env->CallVoidMethod(data->callback, callback_process_data,
                                           data->readbuf, 0, len);
-                if (data->env->ExceptionCheck())
+                if (data->env->ExceptionCheck()) {
+                    data->env->ExceptionClear();
                     return -1;
+                }
             }
             return 1;
         }
@@ -190,7 +192,7 @@ static jobject Java_mao_archive_unrar_RarFile_readHeader0
                           header.FileCRC, (header.FileTime), header.Flags);
 }
 
-#define MAXBUF (1024*512)
+#define MAXBUF (1024*64)
 static void Java_mao_archive_unrar_RarFile_processFile0
         (JNIEnv *env, jclass jcls, jlong jhandle, jint operation, jstring jdestPath,
          jstring jdestName, jobject callback) {
