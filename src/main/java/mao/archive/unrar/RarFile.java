@@ -1,14 +1,14 @@
 package mao.archive.unrar;
 
+import androidx.annotation.Keep;
+import androidx.annotation.NonNull;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
-
-import androidx.annotation.Keep;
-import androidx.annotation.NonNull;
 
 /**
  * Created by mao on 16-10-9.
@@ -141,14 +141,17 @@ public class RarFile {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         extract(entry, new UnrarCallback() {
             @Override
-            public boolean processData(byte[] b, int off, int len) {
+            public void processData(byte[] b, int off, int len) throws IOException {
                 out.write(b, off, len);
-                return true;
             }
 
             @Override
             public String needPassword() {
                 return password;
+            }
+
+            @Override
+            public void close() throws IOException {
             }
         });
         return new ByteArrayInputStream(out.toByteArray());
@@ -185,6 +188,34 @@ public class RarFile {
             while ((header = readHeader0(handle, callback)) != null) {
                 if (filter != null && filter.accept(header)) {
                     processFile0(handle, RAR_EXTRACT, destPath, null, null);
+                } else {
+                    processFile0(handle, RAR_SKIP, null, null, null);
+                }
+            }
+        } finally {
+            closeArchive(handle);
+        }
+    }
+
+    /**
+     * 批量解压数据到某个目录
+     *
+     * @param filter   对解压文件进行过滤
+     * @throws IOException
+     */
+    public void extractBatch2(PasswordCallback passwordCallback, ExtractFilter filter, OnCreateOutCallback outCallback) throws IOException {
+        if (outCallback == null) {
+            throw new IOException();
+        }
+        final long handle = openArchive(rarPath, RAR_OM_EXTRACT);
+        try {
+            RarEntry header;
+            while ((header = readHeader0(handle, passwordCallback)) != null) {
+                if (filter != null && filter.accept(header)) {
+                    try (UnrarCallback out = outCallback.createOut(header.getName());
+                    ) {
+                        processFile0(handle, RAR_TEST, null, null, out);
+                    }
                 } else {
                     processFile0(handle, RAR_SKIP, null, null, null);
                 }

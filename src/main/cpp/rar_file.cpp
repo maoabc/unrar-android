@@ -39,7 +39,7 @@ void initIDs(JNIEnv *env) {
         return;
     }
 
-    callback_process_data = env->GetMethodID(callback_cls, "processData", "([BII)Z");
+    callback_process_data = env->GetMethodID(callback_cls, "processData", "([BII)V");
 
     callback_need_password = env->GetMethodID(callback_cls, "needPassword", "()Ljava/lang/String;");
 
@@ -85,11 +85,10 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
                 }
                 data->env->SetByteArrayRegion(data->readbuf, 0, len, buf + readed);
 
-                if (!data->env->CallBooleanMethod(data->callback, callback_process_data,
-                                                  data->readbuf, 0, len)) {
+                data->env->CallVoidMethod(data->callback, callback_process_data,
+                                          data->readbuf, 0, len);
+                if (data->env->ExceptionCheck())
                     return -1;
-
-                }
             }
             return 1;
         }
@@ -97,7 +96,7 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
             jstring jpassword = (jstring) data->env->CallObjectMethod(data->callback,
                                                                       callback_need_password);
             if (jpassword != nullptr) {
-                wchar_t *password = (wchar *) P1;
+                wchar_t *password = (wchar_t *) P1;
                 const jchar *chars = data->env->GetStringChars(jpassword, nullptr);
                 jcharntowcs(password, chars,
                             static_cast<size_t >(Min(data->env->GetStringLength(jpassword), P2)));
@@ -191,7 +190,7 @@ static jobject Java_mao_archive_unrar_RarFile_readHeader0
                           header.FileCRC, (header.FileTime), header.Flags);
 }
 
-#define MAXBUF (1024*16)
+#define MAXBUF (1024*512)
 static void Java_mao_archive_unrar_RarFile_processFile0
         (JNIEnv *env, jclass jcls, jlong jhandle, jint operation, jstring jdestPath,
          jstring jdestName, jobject callback) {

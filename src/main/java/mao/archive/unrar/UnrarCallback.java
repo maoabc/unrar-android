@@ -2,10 +2,13 @@ package mao.archive.unrar;
 
 import androidx.annotation.Keep;
 
+import java.io.Closeable;
+import java.io.IOException;
+
 @Keep
-public interface UnrarCallback {
+public interface UnrarCallback extends Closeable {
     @Keep
-    boolean processData(byte[] b, int off, int len);
+    void processData(byte[] b, int off, int len) throws IOException;
 
     @Keep
     String needPassword();

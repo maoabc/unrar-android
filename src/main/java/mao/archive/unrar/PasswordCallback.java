@@ -1,9 +1,14 @@
 package mao.archive.unrar;
 
+import java.io.IOException;
+
 public abstract class PasswordCallback implements UnrarCallback {
     @Override
-    public final boolean processData(byte[] b, int off, int len) {
-        return false;
+    public final void processData(byte[] b, int off, int len) {
     }
 
+    @Override
+    public void close() throws IOException {
+
+    }
 }
