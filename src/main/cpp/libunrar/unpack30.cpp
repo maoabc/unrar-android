@@ -1,3 +1,5 @@
+#include "rar.hpp"
+
 // We use it instead of direct PPM.DecodeChar call to be sure that
 // we reset PPM structures in case of corrupt data. It is important,
 // because these structures can be invalid after PPM.DecodeChar returned -1.

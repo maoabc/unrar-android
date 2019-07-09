@@ -41,6 +41,12 @@ set (unrar_SOURCES
 		list.cpp
 		find.cpp
 		unpack.cpp
+#		unpack15.cpp
+#		unpack20.cpp
+		unpack30.cpp
+		unpack50.cpp
+		unpack50frag.cpp
+		unpack50mt.cpp
 		headers.cpp
 		rs16.cpp
 		ui.cpp
