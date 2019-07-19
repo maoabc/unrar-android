@@ -4,9 +4,9 @@
 #include "jni.h"
 #include "rar.hpp"
 #include "dll.hpp"
-#include "jni_util.h"
 
 #include "rar_file.h"
+#include "ScopedLocalRef.h"
 
 #include <android/log.h>
 
@@ -25,8 +25,16 @@ static jmethodID callback_need_password;
 static jclass entryClass;
 static jmethodID entry_ctor;
 
+static void ThrowExceptionByName(JNIEnv *env, const char *name, const char *msg) {
+    ScopedLocalRef<jclass> cls(env, env->FindClass(name));
+    if (cls.get() != nullptr)
+        env->ThrowNew(cls.get(), msg);
+}
+static void ThrowIOException(JNIEnv *env, const char *msg) {
+    ThrowExceptionByName(env, "java/io/IOException", msg);
+}
+
 void initIDs(JNIEnv *env) {
-    jclass callback_cls = nullptr;
 
     entryClass = static_cast<jclass>(
             env->NewGlobalRef(env->FindClass("mao/archive/unrar/RarEntry")));
@@ -34,19 +42,19 @@ void initIDs(JNIEnv *env) {
         return;
     }
 
-    callback_cls = env->FindClass("mao/archive/unrar/UnrarCallback");
-    if (callback_cls == nullptr) {
+    ScopedLocalRef<jclass> callback_cls(env, env->FindClass("mao/archive/unrar/UnrarCallback"));
+    if (callback_cls.get() == nullptr) {
         return;
     }
 
-    callback_process_data = env->GetMethodID(callback_cls, "processData", "([BII)V");
+    callback_process_data = env->GetMethodID(callback_cls.get(), "processData", "([BII)V");
 
-    callback_need_password = env->GetMethodID(callback_cls, "needPassword", "()Ljava/lang/String;");
+    callback_need_password = env->GetMethodID(callback_cls.get(), "needPassword",
+                                              "()Ljava/lang/String;");
 
 
     entry_ctor = env->GetMethodID(entryClass, "<init>", "(Ljava/lang/String;JJJJI)V");
 
-    env->DeleteLocalRef(callback_cls);
 }
 inline wchar_t *jcharntowcs(wchar *dest, const jchar *src, size_t len) {
     if (dest == nullptr || src == nullptr)
@@ -95,16 +103,18 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
             return 1;
         }
         case UCM_NEEDPASSWORDW: {
-            jstring jpassword = (jstring) data->env->CallObjectMethod(data->callback,
-                                                                      callback_need_password);
-            if (jpassword != nullptr) {
+            ScopedLocalRef<jstring> jpassword(data->env,
+                                              (jstring) data->env->CallObjectMethod(data->callback,
+                                                                                    callback_need_password));
+            if (jpassword.get() != nullptr) {
                 wchar_t *password = (wchar_t *) P1;
-                const jchar *chars = data->env->GetStringChars(jpassword, nullptr);
+                const jchar *chars = data->env->GetStringChars(jpassword.get(), nullptr);
                 jcharntowcs(password, chars,
-                            static_cast<size_t >(Min(data->env->GetStringLength(jpassword), P2)));
+                            static_cast<size_t >(Min(data->env->GetStringLength(jpassword.get()),
+                                                     P2)));
                 //保证字符串正确终止
                 password[P2 - 1] = '\0';
-                data->env->ReleaseStringChars(jpassword, chars);
+                data->env->ReleaseStringChars(jpassword.get(), chars);
                 return 1;
             }
             return -1;
@@ -145,7 +155,7 @@ static jlong Java_mao_archive_unrar_RarFile_openArchive
         }
         char err_str[128];
         sprintf(err_str, "ErrorCode: %d", data.OpenResult);
-        JNU_ThrowByName(env, "mao/archive/unrar/RarException", err_str);
+        ThrowExceptionByName(env, "mao/archive/unrar/RarException", err_str);
         return 0;
     }
     return reinterpret_cast<jlong>(handle);
@@ -170,7 +180,6 @@ static jobject Java_mao_archive_unrar_RarFile_readHeader0
 
 
     struct RARHeaderDataEx header{};
-    memset(&header, 0, sizeof(struct RARHeaderDataEx));
     if (RARReadHeaderEx(handle, &header)) {
         return nullptr;
     }
@@ -183,10 +192,10 @@ static jobject Java_mao_archive_unrar_RarFile_readHeader0
     size_t len = wcslen(header.FileNameW);
     wcsntojchar(name, header.FileNameW, len);
 
-    jstring jname = env->NewString(name, (jsize) len);
+    ScopedLocalRef<jstring> jname(env, env->NewString(name, (jsize) len));
 
 
-    return env->NewObject(entryClass, entry_ctor, jname,
+    return env->NewObject(entryClass, entry_ctor, jname.get(),
                           (((uint64_t) header.UnpSizeHigh) << 32) | header.UnpSize,
                           (((uint64_t) header.PackSizeHigh) << 32) | header.PackSize,
                           header.FileCRC, (header.FileTime), header.Flags);
@@ -239,14 +248,14 @@ static void Java_mao_archive_unrar_RarFile_processFile0
         case ERAR_SUCCESS:
             break;
         case ERAR_BAD_PASSWORD:
-            JNU_ThrowIOException(env, "Bad password");
+            ThrowIOException(env, "Bad password");
             break;
         case ERAR_MISSING_PASSWORD:
-            JNU_ThrowIOException(env, "Missing password");
+            ThrowIOException(env, "Missing password");
             break;
         default:
             LOGI("operation %d,process result %d", operation, code);
-            JNU_ThrowIOException(env, "");
+            ThrowIOException(env, "");
     }
 }
 
@@ -254,7 +263,7 @@ static void Java_mao_archive_unrar_RarFile_closeArchive
         (JNIEnv *env, jclass jcls, jlong jhandle) {
     HANDLE handle = reinterpret_cast<void *>(jhandle);
     if (RARCloseArchive(handle) != ERAR_SUCCESS) {
-        JNU_ThrowIOExceptionWithLastError(env, "close error");
+        ThrowIOException(env, "close error");
     }
 }
 
@@ -273,15 +282,13 @@ static JNINativeMethod methods[] = {
 #define NELEM(x) ((int) (sizeof(x) / sizeof((x)[0])))
 
 jboolean registerNativeMethods(JNIEnv *env) {
-    jclass clazz = env->FindClass("mao/archive/unrar/RarFile");
-    if (clazz == nullptr) {
+    ScopedLocalRef<jclass> clazz(env, env->FindClass("mao/archive/unrar/RarFile"));
+    if (clazz.get() == nullptr) {
         return JNI_FALSE;
     }
-    if (env->RegisterNatives(clazz, methods, NELEM(methods)) < 0) {
-        env->DeleteLocalRef(clazz);
+    if (env->RegisterNatives(clazz.get(), methods, NELEM(methods)) < 0) {
         return JNI_FALSE;
     }
-    env->DeleteLocalRef(clazz);
 
     return JNI_TRUE;
 }
