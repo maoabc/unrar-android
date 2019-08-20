@@ -50,9 +50,13 @@ public class ExampleInstrumentedTest {
         RarFile rarFile = new RarFile("/sdcard/name_encrypted.rar");
         rarFile.extract("网游昵称大全.txt", new UnrarCallback() {
             @Override
-            public boolean processData(byte[] b, int off, int len) throws IOException {
+            public void close() throws IOException {
+
+            }
+
+            @Override
+            public void processData(byte[] b, int off, int len) throws IOException {
                 System.out.println(new String(b, off, len, "GBK"));
-                return true;
             }
 
             @Override

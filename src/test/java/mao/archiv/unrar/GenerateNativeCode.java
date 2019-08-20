@@ -19,8 +19,6 @@ public class GenerateNativeCode {
         InputStream inputStream = getClass().getResourceAsStream("/mao/archive/unrar/RarFile.class");
         //创建classReader
         ClassReader reader = new ClassReader(inputStream);
-        //asm是以访问者模式对class进行操作
-        //创建ClassVisitor进行c代码生成
         reader.accept(new ClassVisitor(ASM5) {
             private String fullName;
 
