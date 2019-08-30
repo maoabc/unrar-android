@@ -1,5 +1,5 @@
 # unrar-android
-The [unrar](http://rarlab.com) library java binding.
+The [unrar library](https://www.rarlab.com/rar_add.htm) java binding.
 
 List archive entries:
 ```java
