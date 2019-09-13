@@ -37,4 +37,4 @@ rar.extractAll("/destPath/",null);
 While this crate uses the Apache license for the java parts,
       the embedded [C++ library](./src/main/cpp/libunrar/) has a different license.
 
-      For more informations, see its [license file](./src/main/cpp/libunrar/license.txt).
+For more informations, see its [license file](./src/main/cpp/libunrar/license.txt).
