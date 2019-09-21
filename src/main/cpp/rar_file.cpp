@@ -37,12 +37,12 @@ static void ThrowIOException(JNIEnv *env, const char *msg) {
 void initIDs(JNIEnv *env) {
 
     entryClass = static_cast<jclass>(
-            env->NewGlobalRef(env->FindClass("mao/archive/unrar/RarEntry")));
+            env->NewGlobalRef(env->FindClass("com/github/maoabc/unrar/RarEntry")));
     if (entryClass == nullptr) {
         return;
     }
 
-    ScopedLocalRef<jclass> callback_cls(env, env->FindClass("mao/archive/unrar/UnrarCallback"));
+    ScopedLocalRef<jclass> callback_cls(env, env->FindClass("com/github/maoabc/unrar/UnrarCallback"));
     if (callback_cls.get() == nullptr) {
         return;
     }
@@ -133,7 +133,7 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
     return 1;
 }
 
-static jlong Java_mao_archive_unrar_RarFile_openArchive
+static jlong Java_com_github_maoabc_unrar_RarFile_openArchive
         (JNIEnv *env, jclass jcls, jstring jfilePath, jint mode) {
     wchar nameW[NM];
     struct RAROpenArchiveDataEx data{};
@@ -155,14 +155,14 @@ static jlong Java_mao_archive_unrar_RarFile_openArchive
         }
         char err_str[128];
         sprintf(err_str, "ErrorCode: %d", data.OpenResult);
-        ThrowExceptionByName(env, "mao/archive/unrar/RarException", err_str);
+        ThrowExceptionByName(env, "com/github/maoabc/unrar/RarException", err_str);
         return 0;
     }
     return reinterpret_cast<jlong>(handle);
 }
 
 
-static jobject Java_mao_archive_unrar_RarFile_readHeader0
+static jobject Java_com_github_maoabc_unrar_RarFile_readHeader0
         (JNIEnv *env, jclass jcls, jlong jhandle, jobject callback) {
 
     struct user_data userData{};
@@ -202,7 +202,7 @@ static jobject Java_mao_archive_unrar_RarFile_readHeader0
 }
 
 #define MAXBUF (1024*64)
-static void Java_mao_archive_unrar_RarFile_processFile0
+static void Java_com_github_maoabc_unrar_RarFile_processFile0
         (JNIEnv *env, jclass jcls, jlong jhandle, jint operation, jstring jdestPath,
          jstring jdestName, jobject callback) {
     struct user_data userData{};
@@ -259,7 +259,7 @@ static void Java_mao_archive_unrar_RarFile_processFile0
     }
 }
 
-static void Java_mao_archive_unrar_RarFile_closeArchive
+static void Java_com_github_maoabc_unrar_RarFile_closeArchive
         (JNIEnv *env, jclass jcls, jlong jhandle) {
     HANDLE handle = reinterpret_cast<void *>(jhandle);
     if (RARCloseArchive(handle) != ERAR_SUCCESS) {
@@ -269,20 +269,20 @@ static void Java_mao_archive_unrar_RarFile_closeArchive
 
 
 static JNINativeMethod methods[] = {
-        {"openArchive",  "(Ljava/lang/String;I)J",                                                     (void *) Java_mao_archive_unrar_RarFile_openArchive},
+        {"openArchive",  "(Ljava/lang/String;I)J",                                                     (void *) Java_com_github_maoabc_unrar_RarFile_openArchive},
 
-        {"readHeader0",  "(JLmao/archive/unrar/UnrarCallback;)Lmao/archive/unrar/RarEntry;",           (void *) Java_mao_archive_unrar_RarFile_readHeader0},
+        {"readHeader0",  "(JLcom/github/maoabc/unrar/UnrarCallback;)Lcom/github/maoabc/unrar/RarEntry;",           (void *) Java_com_github_maoabc_unrar_RarFile_readHeader0},
 
-        {"processFile0", "(JILjava/lang/String;Ljava/lang/String;Lmao/archive/unrar/UnrarCallback;)V", (void *) Java_mao_archive_unrar_RarFile_processFile0},
+        {"processFile0", "(JILjava/lang/String;Ljava/lang/String;Lcom/github/maoabc/unrar/UnrarCallback;)V", (void *) Java_com_github_maoabc_unrar_RarFile_processFile0},
 
-        {"closeArchive", "(J)V",                                                                       (void *) Java_mao_archive_unrar_RarFile_closeArchive},
+        {"closeArchive", "(J)V",                                                                       (void *) Java_com_github_maoabc_unrar_RarFile_closeArchive},
 
 };
 
 #define NELEM(x) ((int) (sizeof(x) / sizeof((x)[0])))
 
 jboolean registerNativeMethods(JNIEnv *env) {
-    ScopedLocalRef<jclass> clazz(env, env->FindClass("mao/archive/unrar/RarFile"));
+    ScopedLocalRef<jclass> clazz(env, env->FindClass("com/github/maoabc/unrar/RarFile"));
     if (clazz.get() == nullptr) {
         return JNI_FALSE;
     }

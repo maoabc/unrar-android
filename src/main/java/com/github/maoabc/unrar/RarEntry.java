@@ -1,8 +1,8 @@
-package mao.archive.unrar;
-
-import java.util.Date;
+package com.github.maoabc.unrar;
 
 import androidx.annotation.Keep;
+
+import java.util.Date;
 
 /**
  * Created by mao on 16-10-9.

@@ -1,4 +1,4 @@
-package mao.archiv.unrar;
+package com.github.maoabc.unrar;
 
 import org.junit.Test;
 import org.objectweb.asm.ClassReader;
@@ -16,7 +16,7 @@ public class GenerateNativeCode {
     @Test
     public void generateNativeRegisterCode() throws IOException {
         //直接获取包内资源，class文件当成资源得到输出流
-        InputStream inputStream = getClass().getResourceAsStream("/mao/archive/unrar/RarFile.class");
+        InputStream inputStream = getClass().getResourceAsStream("/com/github/maoabc/unrar/RarFile.class");
         //创建classReader
         ClassReader reader = new ClassReader(inputStream);
         reader.accept(new ClassVisitor(ASM5) {

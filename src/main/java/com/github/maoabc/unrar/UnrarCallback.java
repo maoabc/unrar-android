@@ -1,4 +1,4 @@
-package mao.archive.unrar;
+package com.github.maoabc.unrar;
 
 import androidx.annotation.Keep;
 
