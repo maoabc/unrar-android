@@ -37,7 +37,7 @@ public class ExampleInstrumentedTest {
     }
 
     private File getTestRarFile(String name) throws IOException {
-        File file = new File(cacheDir, name);
+        File file = new File(cacheDir, name + "\uD83D\uDE02" + "-abcd");
         if (file.exists()) {
             return file;
         }

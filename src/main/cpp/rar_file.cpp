@@ -42,7 +42,8 @@ void initIDs(JNIEnv *env) {
         return;
     }
 
-    ScopedLocalRef<jclass> callback_cls(env, env->FindClass("com/github/maoabc/unrar/UnrarCallback"));
+    ScopedLocalRef<jclass> callback_cls(env,
+                                        env->FindClass("com/github/maoabc/unrar/UnrarCallback"));
     if (callback_cls.get() == nullptr) {
         return;
     }
@@ -56,35 +57,85 @@ void initIDs(JNIEnv *env) {
     entry_ctor = env->GetMethodID(entryClass, "<init>", "(Ljava/lang/String;JJJJI)V");
 
 }
-inline wchar_t *jcharntowcs(wchar *dest, const jchar *src, size_t len) {
-    if (dest == nullptr || src == nullptr)
-        return nullptr;
-    size_t i = 0;
-    for (; i < len && src[i] != '\0'; i++) {
-        dest[i] = src[i];
-    }
-    for (; i <= len; i++)
-        dest[i] = '\0';
 
-    return dest;
+enum {
+    MIN_HIGH_SURROGATE = 0xD800U,
+    MAX_HIGH_SURROGATE = 0xDBFFU,
+    MIN_LOW_SURROGATE = 0xDC00U,
+    MAX_LOW_SURROGATE = 0xDFFFU,
+    MIN_SUPPLEMENTARY_CODE_POINT = 0x010000U,
+    MAX_CODE_POINT = 0X10FFFFU
+};
+
+
+constexpr static bool IsHighSurrogate(jchar ch) {
+    return ch >= MIN_HIGH_SURROGATE && ch <= MAX_HIGH_SURROGATE;
 }
-inline jchar *wcsntojchar(jchar *dest, const wchar *src, size_t len) {
+
+constexpr static bool IsLowSurrogate(jchar ch) {
+    return ch >= MIN_LOW_SURROGATE && ch <= MAX_LOW_SURROGATE;
+}
+
+constexpr static jchar HighSurrogate(wchar_t wc) {
+    return static_cast<jchar>((wc >> 10)
+                              + (MIN_HIGH_SURROGATE - (MIN_SUPPLEMENTARY_CODE_POINT >> 10)));
+}
+
+constexpr static jchar LowSurrogate(wchar_t wc) {
+    return static_cast<jchar>((wc & 0x3ff) + MIN_LOW_SURROGATE);
+}
+
+inline size_t jcharntowcs(wchar_t *dest, const jchar *src, size_t len) {
     if (dest == nullptr || src == nullptr)
-        return nullptr;
+        return 0;
     size_t i = 0;
-    for (; i < len && src[i] != '\0'; i++) {
-        dest[i] = (jchar) src[i];
+    size_t j = 0;
+    for (; i < len && src[i] != '\0'; i++, j++) {
+        jchar jc = src[i];
+        if (IsHighSurrogate(jc) && i + 1 < len) {
+            jchar jc2 = src[i + 1];
+            if (IsLowSurrogate(jc2)) {
+                dest[j] = ((jc << 10) + jc2) + (MIN_SUPPLEMENTARY_CODE_POINT
+                                                - (MIN_HIGH_SURROGATE << 10)
+                                                - MIN_LOW_SURROGATE);
+                i++;
+            } else {
+                dest[j] = jc;
+            }
+        } else {
+            dest[j] = jc;
+        }
+
     }
-    for (; i <= len; i++)
-        dest[i] = '\0';
-    return dest;
+    dest[j] = '\0';
+
+    return j;
+}
+inline size_t wcsntojchar(jchar *dest, const wchar_t *src, size_t len) {
+    if (dest == nullptr || src == nullptr)
+        return 0;
+
+    size_t i = 0;
+    size_t j = 0;
+    for (; i < len && src[i] != '\0'; i++, j++) {
+        wchar_t cp = src[i];
+        if ((cp >> 16) == 0) {
+            dest[j] = (jchar) cp;
+        } else if ((cp >> 16) < ((MAX_CODE_POINT + 1) >> 16)) {
+            dest[j] = HighSurrogate(cp);
+            dest[j + 1] = LowSurrogate(cp);
+            j++;
+        }
+    }
+    dest[j] = '\0';
+    return j;
 }
 
 int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
-    struct user_data *data = (struct user_data *) UserData;
+    auto *data = (struct user_data *) UserData;
     switch (msg) {
         case UCM_PROCESSDATA: {
-            const jbyte *buf = (const jbyte *) P1;
+            const auto *buf = (const jbyte *) P1;
 
             for (jsize readed = 0, rem = (jsize) P2, len = data->env->GetArrayLength(data->readbuf);
                  rem > 0; readed += len, rem -= len) {
@@ -107,7 +158,7 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
                                               (jstring) data->env->CallObjectMethod(data->callback,
                                                                                     callback_need_password));
             if (jpassword.get() != nullptr) {
-                wchar_t *password = (wchar_t *) P1;
+                auto *password = (wchar_t *) P1;
                 const jchar *chars = data->env->GetStringChars(jpassword.get(), nullptr);
                 jcharntowcs(password, chars,
                             static_cast<size_t >(Min(data->env->GetStringLength(jpassword.get()),
@@ -135,8 +186,10 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
 
 static jlong Java_com_github_maoabc_unrar_RarFile_openArchive
         (JNIEnv *env, jclass jcls, jstring jfilePath, jint mode) {
-    wchar nameW[NM];
+    wchar_t nameW[NM];
     struct RAROpenArchiveDataEx data{};
+
+    memset(nameW, 0, sizeof(wchar_t) * NM);
 
     const jchar *path = env->GetStringChars(jfilePath, nullptr);
 
@@ -188,9 +241,8 @@ static jobject Java_com_github_maoabc_unrar_RarFile_readHeader0
         env->DeleteGlobalRef(userData.callback);
     }
 
-    jchar name[1024];
-    size_t len = wcslen(header.FileNameW);
-    wcsntojchar(name, header.FileNameW, len);
+    jchar name[2048];
+    size_t len = wcsntojchar(name, header.FileNameW, wcslen(header.FileNameW));
 
     ScopedLocalRef<jstring> jname(env, env->NewString(name, (jsize) len));
 
@@ -208,10 +260,11 @@ static void Java_com_github_maoabc_unrar_RarFile_processFile0
     struct user_data userData{};
     HANDLE handle = reinterpret_cast<void *>(jhandle);
 
-    wchar_t destPath[NM], destName[NM];
+    wchar_t destPath[NM];
+    wchar_t destName[NM];
 
-    memset(destPath, 0, sizeof(wchar) * NM);
-    memset(destName, 0, sizeof(wchar) * NM);
+    memset(destPath, 0, sizeof(wchar_t) * NM);
+    memset(destName, 0, sizeof(wchar_t) * NM);
 
     if (jdestPath != nullptr) {
         const jchar *chars = env->GetStringChars(jdestPath, nullptr);
@@ -269,13 +322,13 @@ static void Java_com_github_maoabc_unrar_RarFile_closeArchive
 
 
 static JNINativeMethod methods[] = {
-        {"openArchive",  "(Ljava/lang/String;I)J",                                                     (void *) Java_com_github_maoabc_unrar_RarFile_openArchive},
+        {"openArchive",  "(Ljava/lang/String;I)J",                                                           (void *) Java_com_github_maoabc_unrar_RarFile_openArchive},
 
-        {"readHeader0",  "(JLcom/github/maoabc/unrar/UnrarCallback;)Lcom/github/maoabc/unrar/RarEntry;",           (void *) Java_com_github_maoabc_unrar_RarFile_readHeader0},
+        {"readHeader0",  "(JLcom/github/maoabc/unrar/UnrarCallback;)Lcom/github/maoabc/unrar/RarEntry;",     (void *) Java_com_github_maoabc_unrar_RarFile_readHeader0},
 
         {"processFile0", "(JILjava/lang/String;Ljava/lang/String;Lcom/github/maoabc/unrar/UnrarCallback;)V", (void *) Java_com_github_maoabc_unrar_RarFile_processFile0},
 
-        {"closeArchive", "(J)V",                                                                       (void *) Java_com_github_maoabc_unrar_RarFile_closeArchive},
+        {"closeArchive", "(J)V",                                                                             (void *) Java_com_github_maoabc_unrar_RarFile_closeArchive},
 
 };
 
