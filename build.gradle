@@ -36,7 +36,6 @@ dependencies {
         exclude group: 'androidx.annotation', module: 'annotation'
     })
     testImplementation 'junit:junit:4.12'
-    testImplementation 'org.ow2.asm:asm:6.2'
 
     implementation "androidx.annotation:annotation:1.1.0"
 }

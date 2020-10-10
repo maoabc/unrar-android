@@ -8,6 +8,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 
 /**
@@ -141,8 +142,10 @@ public class RarFile {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
         extract(entry, new UnrarCallback() {
             @Override
-            public void processData(byte[] b, int off, int len) throws IOException {
-                out.write(b, off, len);
+            public void processData(ByteBuffer buffer, int len) throws IOException {
+                byte[] bytes = new byte[len];
+                buffer.get(bytes);
+                out.write(bytes, 0, len);
             }
 
             @Override

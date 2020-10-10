@@ -13,17 +13,22 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-struct user_data {
-    JNIEnv *env;
-    jobject callback;
-    jbyteArray readbuf;
-};
 
-static jmethodID callback_process_data;
-static jmethodID callback_need_password;
+extern JavaVM *javaVM;
+
+static JNIEnv *getJNIEnv() {
+    JNIEnv *env;
+    if (javaVM->GetEnv((void **) &env, JNI_VERSION_1_6) != JNI_OK) {
+        return nullptr;
+    }
+    return env;
+}
+
+static jmethodID callbackProcessDataMethod;
+static jmethodID callbackNeedPasswordMethod;
 
 static jclass entryClass;
-static jmethodID entry_ctor;
+static jmethodID entryCtor;
 
 static void ThrowExceptionByName(JNIEnv *env, const char *name, const char *msg) {
     ScopedLocalRef<jclass> cls(env, env->FindClass(name));
@@ -48,13 +53,14 @@ void initIDs(JNIEnv *env) {
         return;
     }
 
-    callback_process_data = env->GetMethodID(callback_cls.get(), "processData", "([BII)V");
+    callbackProcessDataMethod = env->GetMethodID(callback_cls.get(), "processData",
+                                                 "(Ljava/nio/ByteBuffer;I)V");
 
-    callback_need_password = env->GetMethodID(callback_cls.get(), "needPassword",
-                                              "()Ljava/lang/String;");
+    callbackNeedPasswordMethod = env->GetMethodID(callback_cls.get(), "needPassword",
+                                                  "()Ljava/lang/String;");
 
 
-    entry_ctor = env->GetMethodID(entryClass, "<init>", "(Ljava/lang/String;JJJJI)V");
+    entryCtor = env->GetMethodID(entryClass, "<init>", "(Ljava/lang/String;JJJJI)V");
 
 }
 
@@ -85,7 +91,7 @@ constexpr static jchar LowSurrogate(wchar_t wc) {
     return static_cast<jchar>((wc & 0x3ff) + MIN_LOW_SURROGATE);
 }
 
-inline size_t jcharntowcs(wchar_t *dest, const jchar *src, size_t len) {
+inline size_t Utf16ToUtf32(wchar_t *dest, const jchar *src, size_t len) {
     if (dest == nullptr || src == nullptr)
         return 0;
     size_t i = 0;
@@ -111,7 +117,7 @@ inline size_t jcharntowcs(wchar_t *dest, const jchar *src, size_t len) {
 
     return j;
 }
-inline size_t wcsntojchar(jchar *dest, const wchar_t *src, size_t len) {
+inline size_t Utf32ToUtf16(jchar *dest, const wchar_t *src, size_t len) {
     if (dest == nullptr || src == nullptr)
         return 0;
 
@@ -132,40 +138,35 @@ inline size_t wcsntojchar(jchar *dest, const wchar_t *src, size_t len) {
 }
 
 int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
-    auto *data = (struct user_data *) UserData;
+    auto callback = (jobject) UserData;
     switch (msg) {
         case UCM_PROCESSDATA: {
-            const auto *buf = (const jbyte *) P1;
+            JNIEnv *env = getJNIEnv();
+            auto size = (jsize) P2;
+            jobject byteBuffer = env->NewDirectByteBuffer(reinterpret_cast<void *>(P1), size);
 
-            for (jsize readed = 0, rem = (jsize) P2, len = data->env->GetArrayLength(data->readbuf);
-                 rem > 0; readed += len, rem -= len) {
-                if (len > rem) {
-                    len = rem;
-                }
-                data->env->SetByteArrayRegion(data->readbuf, 0, len, buf + readed);
-
-                data->env->CallVoidMethod(data->callback, callback_process_data,
-                                          data->readbuf, 0, len);
-                if (data->env->ExceptionCheck()) {
-                    data->env->ExceptionClear();
-                    return -1;
-                }
+            env->CallVoidMethod(callback, callbackProcessDataMethod, byteBuffer, size);
+            if (env->ExceptionCheck()) {
+                env->ExceptionClear();
+                return -1;
             }
+
             return 1;
         }
         case UCM_NEEDPASSWORDW: {
-            ScopedLocalRef<jstring> jpassword(data->env,
-                                              (jstring) data->env->CallObjectMethod(data->callback,
-                                                                                    callback_need_password));
+            JNIEnv *env = getJNIEnv();
+            ScopedLocalRef<jstring> jpassword(env,
+                                              (jstring) env->CallObjectMethod(callback,
+                                                                              callbackNeedPasswordMethod));
             if (jpassword.get() != nullptr) {
                 auto *password = (wchar_t *) P1;
-                const jchar *chars = data->env->GetStringChars(jpassword.get(), nullptr);
-                jcharntowcs(password, chars,
-                            static_cast<size_t >(Min(data->env->GetStringLength(jpassword.get()),
-                                                     P2)));
+                const jchar *chars = env->GetStringChars(jpassword.get(), nullptr);
+                Utf16ToUtf32(password, chars,
+                             static_cast<size_t >(Min(env->GetStringLength(jpassword.get()),
+                                                      P2)));
                 //保证字符串正确终止
                 password[P2 - 1] = '\0';
-                data->env->ReleaseStringChars(jpassword.get(), chars);
+                env->ReleaseStringChars(jpassword.get(), chars);
                 return 1;
             }
             return -1;
@@ -193,7 +194,7 @@ static jlong Java_com_github_maoabc_unrar_RarFile_openArchive
 
     const jchar *path = env->GetStringChars(jfilePath, nullptr);
 
-    jcharntowcs(nameW, path, (size_t) env->GetStringLength(jfilePath));
+    Utf16ToUtf32(nameW, path, (size_t) env->GetStringLength(jfilePath));
 
     env->ReleaseStringChars(jfilePath, path);
 
@@ -218,16 +219,15 @@ static jlong Java_com_github_maoabc_unrar_RarFile_openArchive
 static jobject Java_com_github_maoabc_unrar_RarFile_readHeader0
         (JNIEnv *env, jclass jcls, jlong jhandle, jobject callback) {
 
-    struct user_data userData{};
 
     HANDLE handle = reinterpret_cast<void *>(jhandle);
-
+    jobject globalCallback;
     if (callback != nullptr) {
-        userData.env = env;
-        userData.callback = env->NewGlobalRef(callback);
+        globalCallback = env->NewGlobalRef(callback);
         //需要密码回调
-        RARSetCallback(handle, callbackFunc, (LPARAM) &userData);
+        RARSetCallback(handle, callbackFunc, (LPARAM) globalCallback);
     } else {
+        globalCallback = nullptr;
         RARSetCallback(handle, nullptr, (LPARAM) nullptr);
     }
 
@@ -237,17 +237,17 @@ static jobject Java_com_github_maoabc_unrar_RarFile_readHeader0
         return nullptr;
     }
 
-    if (userData.callback) {
-        env->DeleteGlobalRef(userData.callback);
+    if (globalCallback) {
+        env->DeleteGlobalRef(globalCallback);
     }
 
     jchar name[2048];
-    size_t len = wcsntojchar(name, header.FileNameW, wcslen(header.FileNameW));
+    size_t len = Utf32ToUtf16(name, header.FileNameW, wcslen(header.FileNameW));
 
     ScopedLocalRef<jstring> jname(env, env->NewString(name, (jsize) len));
 
 
-    return env->NewObject(entryClass, entry_ctor, jname.get(),
+    return env->NewObject(entryClass, entryCtor, jname.get(),
                           (((uint64_t) header.UnpSizeHigh) << 32) | header.UnpSize,
                           (((uint64_t) header.PackSizeHigh) << 32) | header.PackSize,
                           header.FileCRC, (header.FileTime), header.Flags);
@@ -257,7 +257,6 @@ static jobject Java_com_github_maoabc_unrar_RarFile_readHeader0
 static void Java_com_github_maoabc_unrar_RarFile_processFile0
         (JNIEnv *env, jclass jcls, jlong jhandle, jint operation, jstring jdestPath,
          jstring jdestName, jobject callback) {
-    struct user_data userData{};
     HANDLE handle = reinterpret_cast<void *>(jhandle);
 
     wchar_t destPath[NM];
@@ -268,33 +267,29 @@ static void Java_com_github_maoabc_unrar_RarFile_processFile0
 
     if (jdestPath != nullptr) {
         const jchar *chars = env->GetStringChars(jdestPath, nullptr);
-        jcharntowcs(destPath, chars, static_cast<size_t>(env->GetStringLength(jdestPath)));
+        Utf16ToUtf32(destPath, chars, static_cast<size_t>(env->GetStringLength(jdestPath)));
         env->ReleaseStringChars(jdestPath, chars);
     }
 
     if (jdestName != nullptr) {
         const jchar *chars = env->GetStringChars(jdestName, nullptr);
-        jcharntowcs(destName, chars, static_cast<size_t>(env->GetStringLength(jdestName)));
+        Utf16ToUtf32(destName, chars, static_cast<size_t>(env->GetStringLength(jdestName)));
         env->ReleaseStringChars(jdestName, chars);
     }
 
+    jobject globalCallback;
     if (callback != nullptr) {//UCM_PROCESSDATA
-        userData.env = env;
-        userData.callback = env->NewGlobalRef(callback);
+        globalCallback = env->NewGlobalRef(callback);
 
-        userData.readbuf = static_cast<jbyteArray>(env->NewGlobalRef(env->NewByteArray(MAXBUF)));
-
-        RARSetCallback(handle, callbackFunc, (LPARAM) &userData);
+        RARSetCallback(handle, callbackFunc, (LPARAM) globalCallback);
     } else {
+        globalCallback = nullptr;
         RARSetCallback(handle, nullptr, (LPARAM) nullptr);
     }
     int code = RARProcessFileW(handle, operation, destPath, destName);
 
-    if (userData.callback) {
-        env->DeleteGlobalRef(userData.callback);
-    }
-    if (userData.readbuf) {
-        env->DeleteGlobalRef(userData.readbuf);
+    if (globalCallback) {
+        env->DeleteGlobalRef(globalCallback);
     }
     //检查异常
     switch (code) {

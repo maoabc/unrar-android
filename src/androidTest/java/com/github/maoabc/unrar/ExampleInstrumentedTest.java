@@ -14,6 +14,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 
 import static org.junit.Assert.assertEquals;
 
@@ -32,7 +33,6 @@ public class ExampleInstrumentedTest {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getTargetContext();
 
-        assertEquals("mao.archive.unrar.test", appContext.getPackageName());
         cacheDir = appContext.getCacheDir();
     }
 
@@ -86,8 +86,11 @@ public class ExampleInstrumentedTest {
             }
 
             @Override
-            public void processData(byte[] b, int off, int len) throws IOException {
-                System.out.println(new String(b, off, len, "GBK"));
+            public void processData(ByteBuffer buffer, int len) throws IOException {
+
+                byte[] bytes = new byte[len];
+                buffer.get(bytes);
+                System.out.println(new String(bytes, 0, len, "GBK"));
             }
 
             @Override

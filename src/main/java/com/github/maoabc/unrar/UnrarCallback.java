@@ -4,11 +4,12 @@ import androidx.annotation.Keep;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 @Keep
 public interface UnrarCallback extends Closeable {
     @Keep
-    void processData(byte[] b, int off, int len) throws IOException;
+    void processData(ByteBuffer buffer, int len) throws IOException;
 
     @Keep
     String needPassword();
