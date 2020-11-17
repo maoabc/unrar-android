@@ -185,8 +185,8 @@ int CALLBACK callbackFunc(UINT msg, LPARAM UserData, LPARAM P1, LPARAM P2) {
     return 1;
 }
 
-static jlong Java_com_github_maoabc_unrar_RarFile_openArchive
-        (JNIEnv *env, jclass jcls, jstring jfilePath, jint mode) {
+static jlong Java_com_github_maoabc_unrar_RarFile_openArchive0
+        (JNIEnv *env, jclass jcls, jstring jfilePath, jint mode, jintArray flags) {
     wchar_t nameW[NM];
     struct RAROpenArchiveDataEx data{};
 
@@ -211,6 +211,9 @@ static jlong Java_com_github_maoabc_unrar_RarFile_openArchive
         sprintf(err_str, "ErrorCode: %d", data.OpenResult);
         ThrowExceptionByName(env, "com/github/maoabc/unrar/RarException", err_str);
         return 0;
+    }
+    if (flags) {
+        env->SetIntArrayRegion(flags, 0, 1, reinterpret_cast<const jint *>(&data.Flags));
     }
     return reinterpret_cast<jlong>(handle);
 }
@@ -307,7 +310,7 @@ static void Java_com_github_maoabc_unrar_RarFile_processFile0
     }
 }
 
-static void Java_com_github_maoabc_unrar_RarFile_closeArchive
+static void Java_com_github_maoabc_unrar_RarFile_closeArchive0
         (JNIEnv *env, jclass jcls, jlong jhandle) {
     HANDLE handle = reinterpret_cast<void *>(jhandle);
     if (RARCloseArchive(handle) != ERAR_SUCCESS) {
@@ -317,13 +320,13 @@ static void Java_com_github_maoabc_unrar_RarFile_closeArchive
 
 
 static JNINativeMethod methods[] = {
-        {"openArchive",  "(Ljava/lang/String;I)J",                                                           (void *) Java_com_github_maoabc_unrar_RarFile_openArchive},
+        {"openArchive0",  "(Ljava/lang/String;I[I)J",                                                         (void *) Java_com_github_maoabc_unrar_RarFile_openArchive0},
 
-        {"readHeader0",  "(JLcom/github/maoabc/unrar/UnrarCallback;)Lcom/github/maoabc/unrar/RarEntry;",     (void *) Java_com_github_maoabc_unrar_RarFile_readHeader0},
+        {"readHeader0",   "(JLcom/github/maoabc/unrar/UnrarCallback;)Lcom/github/maoabc/unrar/RarEntry;",     (void *) Java_com_github_maoabc_unrar_RarFile_readHeader0},
 
-        {"processFile0", "(JILjava/lang/String;Ljava/lang/String;Lcom/github/maoabc/unrar/UnrarCallback;)V", (void *) Java_com_github_maoabc_unrar_RarFile_processFile0},
+        {"processFile0",  "(JILjava/lang/String;Ljava/lang/String;Lcom/github/maoabc/unrar/UnrarCallback;)V", (void *) Java_com_github_maoabc_unrar_RarFile_processFile0},
 
-        {"closeArchive", "(J)V",                                                                             (void *) Java_com_github_maoabc_unrar_RarFile_closeArchive},
+        {"closeArchive0", "(J)V",                                                                             (void *) Java_com_github_maoabc_unrar_RarFile_closeArchive0},
 
 };
 

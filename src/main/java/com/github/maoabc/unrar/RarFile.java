@@ -2,6 +2,8 @@ package com.github.maoabc.unrar;
 
 import androidx.annotation.Keep;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.Size;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -46,6 +48,36 @@ public class RarFile {
         this(file.getCanonicalPath());
     }
 
+
+    // if (Data->Arc.Volume)
+    // r->Flags|=0x01;
+    // if (Data->Arc.MainComment)
+    // r->Flags|=0x02;
+    // if (Data->Arc.Locked)
+    // r->Flags|=0x04;
+    // if (Data->Arc.Solid)
+    // r->Flags|=0x08;
+    // if (Data->Arc.NewNumbering)
+    // r->Flags|=0x10;
+    // if (Data->Arc.Signed)
+    // r->Flags|=0x20;
+    // if (Data->Arc.Protected)
+    // r->Flags|=0x40;
+    // if (Data->Arc.Encrypted)
+    // r->Flags|=0x80;
+    // if (Data->Arc.FirstVolume)
+    // r->Flags|=0x100;
+    public boolean isEncrypted() throws IOException {
+        int[] flags = new int[1];
+        final long handle = openArchive0(rarPath, RAR_OM_LIST, flags);
+        try {
+            return (flags[0] & 0x80) == 0x80;
+
+        } finally {
+            closeArchive0(handle);
+        }
+    }
+
     /**
      * 列出rar内所有文件
      *
@@ -53,7 +85,7 @@ public class RarFile {
      * @throws IOException 打开rar异常
      */
     public Iterable<RarEntry> getEntries(final UnrarCallback callback) throws IOException {
-        final long handle = openArchive(rarPath, RAR_OM_LIST);
+        final long handle = openArchive0(rarPath, RAR_OM_LIST, null);
 
         return new Iterable<RarEntry>() {
             @NonNull
@@ -90,7 +122,7 @@ public class RarFile {
                         }
                         closed = true;
                         try {
-                            closeArchive(handle);
+                            closeArchive0(handle);
                         } catch (IOException ignored) {
                         }
                     }
@@ -112,7 +144,7 @@ public class RarFile {
      */
     public void extract(String entryName, UnrarCallback callback) throws IOException {
 
-        final long handle = openArchive(rarPath, RAR_OM_EXTRACT);
+        final long handle = openArchive0(rarPath, RAR_OM_EXTRACT, null);
 
         try {
 
@@ -126,7 +158,7 @@ public class RarFile {
                 }
             }
         } finally {
-            closeArchive(handle);
+            closeArchive0(handle);
         }
     }
 
@@ -185,7 +217,7 @@ public class RarFile {
      * @throws IOException
      */
     public void extractBatch(String destPath, UnrarCallback callback, ExtractFilter filter) throws IOException {
-        final long handle = openArchive(rarPath, RAR_OM_EXTRACT);
+        final long handle = openArchive0(rarPath, RAR_OM_EXTRACT, null);
         try {
             RarEntry header;
             while ((header = readHeader0(handle, callback)) != null) {
@@ -196,7 +228,7 @@ public class RarFile {
                 }
             }
         } finally {
-            closeArchive(handle);
+            closeArchive0(handle);
         }
     }
 
@@ -210,7 +242,7 @@ public class RarFile {
         if (outCallback == null) {
             throw new IOException();
         }
-        final long handle = openArchive(rarPath, RAR_OM_EXTRACT);
+        final long handle = openArchive0(rarPath, RAR_OM_EXTRACT, null);
         try {
             RarEntry header;
             while ((header = readHeader0(handle, passwordCallback)) != null) {
@@ -226,13 +258,13 @@ public class RarFile {
                 }
             }
         } finally {
-            closeArchive(handle);
+            closeArchive0(handle);
         }
     }
 
 
     @Keep
-    private static native long openArchive(String rarName, int mode) throws RarException;
+    private static native long openArchive0(String rarName, int mode, @Nullable @Size(1) int[] flags) throws RarException;
 
     //读取rar头
     @Keep
@@ -244,7 +276,7 @@ public class RarFile {
 
 
     @Keep
-    private static native void closeArchive(long handle) throws IOException;
+    private static native void closeArchive0(long handle) throws IOException;
 
 
 }

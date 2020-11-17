@@ -17,6 +17,8 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Instrumentation test, which will execute on an Android device.
@@ -98,6 +100,18 @@ public class ExampleInstrumentedTest {
                 return "190512";
             }
         });
+
+    }
+
+    @Test
+    public void testRarOpenFlags() throws IOException {
+        File testRarFile = getTestRarFile("name_encrypted.rar");
+        RarFile rarFile = new RarFile(testRarFile);
+        assertTrue(rarFile.isEncrypted());
+        //
+        testRarFile = getTestRarFile("testRar5.rar");
+        rarFile = new RarFile(testRarFile);
+        assertFalse(rarFile.isEncrypted());
 
     }
 
