@@ -96,24 +96,23 @@ public class RarFile {
 
                     public boolean hasNext() {
                         entry = readHeader0(handle, callback);
+                        return entry != null;
+                    }
+
+                    public RarEntry next() {
                         if (entry == null) {
                             close();
-                            return false;
+                            return null;
                         }
                         try {
                             processFile0(handle, RAR_SKIP, null, null, null);
                         } catch (IOException ignored) {
                             //todo except
                         }
-                        return true;
-                    }
-
-                    public RarEntry next() {
                         return entry;
                     }
 
                     public void remove() {
-
                     }
 
                     private void close() {
